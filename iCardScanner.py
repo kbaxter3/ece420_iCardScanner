@@ -146,10 +146,11 @@ while True:
         # Get perspective transformation
         W = 480
         H = int(W // 1.6)
-        M_perspective = cv2.getPerspectiveTransform(np.float32(approx_contour), np.float32([[0, 0], [0, H], [W, H], [W, 0]]))
+        PAD = 10
+        M_perspective = cv2.getPerspectiveTransform(np.float32(approx_contour), np.float32([[PAD, PAD], [PAD, H+PAD], [W+PAD, H+PAD], [W+PAD, PAD]]))
         
         hh, ww = img.shape[:2]
-        perspective_img = cv2.warpPerspective(img, M_perspective, (ww,hh))[0:H,0:W]
+        perspective_img = cv2.warpPerspective(img, M_perspective, (ww,hh))[0:H+2*PAD,0:W+2*PAD]
         cv2.imshow('Perspectived', perspective_img)
         cv2.imshow("Annotated", img_poly_contour)
         
@@ -162,14 +163,44 @@ while True:
                 user_in = True
             else:
                 user_input = input("Invalid input, please enter a digit between 0-1: ")
+        
+        # TESTING: card detection accuracy by evaluating two of the angles of the contour
+        # ANGLE_THESHOLD = 30
+        # vec1 = approx_contour[0,0] - approx_contour[1,0]
+        # vec2 = approx_contour[0,0] - approx_contour[-1,0]
+        # vec3 = approx_contour[2,0] - approx_contour[1,0]
+        # vec4 = approx_contour[2,0] - approx_contour[3,0]
+        # dot_product = np.dot(vec1, vec2)
+        # magnitude_A = np.linalg.norm(vec1)
+        # magnitude_B = np.linalg.norm(vec2)
+        # angle_1 = np.abs(np.degrees(np.arccos(dot_product / (magnitude_A * magnitude_B))))
+        # dot_product = np.dot(vec3, vec4)
+        # magnitude_A = np.linalg.norm(vec3)
+        # magnitude_B = np.linalg.norm(vec4)
+        # angle_2 = np.abs(np.degrees(np.arccos(dot_product / (magnitude_A * magnitude_B))))
+        # if((angle_1 + angle_2) > 180 - ANGLE_THESHOLD and (angle_1 + angle_2) < 180 + ANGLE_THESHOLD):
+        #     user_input_accurate_frames.append(1)
+        #     print("Good frame")
+        # else:
+        #     # User input to check for mistakes
+        #     user_input = input("Bad frame, enter 1 to switch to good frame: ")
+        #     if(user_input == 1):
+        #         user_input_accurate_frames.append(1)
+        #     else:
+        #         user_input_accurate_frames.append(0)
+        #     print(f"Bad frame: {angle_1}, {angle_2}")
+        #     cv2.waitKey(0)
             
+        
+        
+        user_input_accurate_frames.append(1) # delete later
             
             
         # Tesseract text recognition
         # Crop the card to the UIN text
-        uin_x_start = (int)(W*2/11)
+        uin_x_start = (int)(W*2/11)+PAD
         uin_width = (int)(W/4)
-        uin_y_start = H - (int)(H/10)
+        uin_y_start = H - (int)(H/10)+PAD
         uin_height = (int)(H/10)
         img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
         cv2.imshow("NetID Cropped", img_uin)
@@ -178,6 +209,7 @@ while True:
         
         # If the text identified is not the uin, try flipping the image
         if(not uin_text.isdigit() and len(uin_text) != 9):
+            print(f"UIN: {uin_text}, length: {len(uin_text)}")
             perspective_img = perspective_img[::-1, ::-1]
             img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
             uin_text = extract_text_from_image(img_uin)
@@ -202,6 +234,7 @@ while True:
         
     else:
         print("No card detected")
+        user_input_accurate_frames.append(0)
         
         
         
