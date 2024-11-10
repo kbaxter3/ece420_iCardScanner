@@ -75,11 +75,17 @@ def list_jpg_files(directory):
         return []
 
 def extract_text_from_image(image):
+    # Threhold the image
+    blur = cv2.GaussianBlur(image,(3,3),0)
+    ret3,img_uin = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
     # Convert the image to RGB (Tesseract requires RGB images)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # Use Tesseract to extract text
-    text = pytesseract.image_to_string(rgb_image)
+    # Use Tesseract to extract text, signle line mode (psm7)
+    text = pytesseract.image_to_string(rgb_image, config='--psm 7')
+    
+    cv2.imshow("thresh_crop", img_uin)
 
     return text
 
@@ -90,7 +96,7 @@ IMG_DIR = 'imgs/'
 
 jpg_names = list_jpg_files(IMG_DIR)
 
-video = cv2.VideoCapture(f'{IMG_DIR}icard0_vid.mp4')
+video = cv2.VideoCapture(f'{IMG_DIR}icard4_vid.mov')
 TRUE_UIN = "659750250" 
 
 if not video.isOpened():
@@ -106,7 +112,7 @@ accurate_uin = []
 #     img = cv2.imread(f"{IMG_DIR}{filename}", cv2.IMREAD_GRAYSCALE)
 
 while True:
-    read_success, img = video.read()
+    read_success, img_color = video.read()
     if not read_success:
         print('End of video')
         cv2.waitKey(0)
@@ -121,10 +127,10 @@ while True:
         
         sys.exit()
         
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
 
     
-    img_poly_contour = img.copy()
+    img_poly_contour = img_color
     approx_contour = get_bounding_quadrangle(img)
     
     if(type(approx_contour) == np.ndarray and approx_contour.shape[0] == 4):
@@ -150,19 +156,7 @@ while True:
         
         hh, ww = img.shape[:2]
         perspective_img = cv2.warpPerspective(img, M_perspective, (ww,hh))[0:H,0:W]
-        cv2.imshow('Perspectived', perspective_img)
-        cv2.imshow("Annotated", img_poly_contour)
         
-        # TESTING: user input for card detection accuracy
-        user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
-        user_in = False
-        while(user_in == False):
-            if user_input.isdigit():
-                user_input_accurate_frames.append(int(user_input))
-                user_in = True
-            else:
-                user_input = input("Invalid input, please enter a digit between 0-1: ")
-            
             
             
         # Tesseract text recognition
@@ -172,40 +166,58 @@ while True:
         uin_y_start = H - (int)(H/10)
         uin_height = (int)(H/10)
         img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
-        cv2.imshow("NetID Cropped", img_uin)
         uin_text = extract_text_from_image(img_uin)
         uin_text = uin_text.replace("\n","")
+        cv2.imshow("NetID Cropped", img_uin)
         
         # If the text identified is not the uin, try flipping the image
-        if(not uin_text.isdigit() and len(uin_text) != 9):
+        if(not uin_text.isdigit() or len(uin_text) != 9):
             perspective_img = perspective_img[::-1, ::-1]
             img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
             uin_text = extract_text_from_image(img_uin)
             uin_text = uin_text.replace("\n","")
-            cv2.imshow("NetID Cropped", img_uin)
+            cv2.imshow("NetID Cropped flipped", img_uin)
             cv2.imshow('Perspectived', perspective_img)
             print("rotated")
             
+            if(not uin_text.isdigit() or len(uin_text) != 9):
+                uin_text = "not found"
+            
             
         # If the text still does not resemble a uin, print no text detected
-        if(not uin_text.isdigit() and len(uin_text) != 9):
+        if(not uin_text.isdigit() or len(uin_text) != 9):
             print("No UIN Detected")
         
         print(f"UIN: {uin_text}, length: {len(uin_text)}")
         
+        cv2.putText(img_poly_contour, f"UIN: {uin_text}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
+        
+        cv2.imshow('Perspectived', perspective_img)
+        cv2.imshow("Annotated", img_poly_contour)
+        
+        # TESTING: user input for card detection accuracy
+        # user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
+        # user_in = False
+        # while(user_in == False):
+        #     if user_input.isdigit():
+        #         user_input_accurate_frames.append(int(user_input))
+        #         user_in = True
+        #     else:
+        #         user_input = input("Invalid input, please enter a digit between 0-1: ")
+        
         # TESTING record if UIN is correct
-        if(uin_text == TRUE_UIN):
-            print("Correct UIN")
-            accurate_uin.append(1)
-        else:
-            accurate_uin.append(0)
+        # if(uin_text == TRUE_UIN):
+        #     print("Correct UIN")
+        #     accurate_uin.append(1)
+        # else:
+        #     accurate_uin.append(0)
         
     else:
         print("No card detected")
         
         
-        
-    cv2.waitKey(2)
+    # cv2.waitKey(0)        
+    cv2.waitKey(1)
 
 #%%
 cv2.waitKey(0)
