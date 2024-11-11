@@ -96,8 +96,17 @@ IMG_DIR = 'imgs/'
 
 jpg_names = list_jpg_files(IMG_DIR)
 
-video = cv2.VideoCapture(f'{IMG_DIR}icard4_vid.mov')
+video = cv2.VideoCapture(f'{IMG_DIR}icard0_vid.mp4')
 TRUE_UIN = "659750250" 
+
+# Set up output video file writer (for presentation)
+# output_video_path = f'{IMG_DIR}icard0_outputvid_1.mp4'
+# frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+# frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+# fps = 2 #video.get(cv2.CAP_PROP_FPS)
+# fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 file
+# out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+
 
 if not video.isOpened():
     print('Cannot open video')
@@ -106,6 +115,7 @@ if not video.isOpened():
 # TESTING: variables to store accuracy measurement
 user_input_accurate_frames = []
 accurate_uin = []
+false_uin = []
 
     
 # for filename in jpg_names:
@@ -118,11 +128,15 @@ while True:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         
-        # TESTING: save accuracy mesurements to csv file
+        # For the output annotated video
+        #out.release()
+        
+        # TESTING: accuracy metrics
         user_input_accurate_frames = user_input_accurate_frames[1:]
         accurate_uin = accurate_uin[1:]
         print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
         print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
+        
         
         
         sys.exit()
@@ -195,7 +209,9 @@ while True:
         cv2.imshow('Perspectived', perspective_img)
         cv2.imshow("Annotated", img_poly_contour)
         
-        # TESTING: user input for card detection accuracy
+        #out.write(img_poly_contour)
+        
+        # # TESTING: user input for card detection accuracy
         # user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
         # user_in = False
         # while(user_in == False):
@@ -206,11 +222,16 @@ while True:
         #         user_input = input("Invalid input, please enter a digit between 0-1: ")
         
         # TESTING record if UIN is correct
-        # if(uin_text == TRUE_UIN):
-        #     print("Correct UIN")
-        #     accurate_uin.append(1)
-        # else:
-        #     accurate_uin.append(0)
+        if(uin_text == TRUE_UIN):
+            print("Correct UIN")
+            accurate_uin.append(1)
+        else: 
+            accurate_uin.append(0)
+            if(len(uin_text) == len(TRUE_UIN) and uin_text.isdigit()):
+                false_uin.append(1)
+            else:
+                false_uin.append(0)
+        
         
     else:
         print("No card detected")
