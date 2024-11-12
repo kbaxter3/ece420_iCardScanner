@@ -16,7 +16,7 @@ def get_bounding_quadrangle(img):
     
     # Perform Canny Edge detection
     img_edgedetect = cv2.Canny(img_dilate, threshold1=100, threshold2=200)
-    # cv2.imshow('Edges', img_edgedetect)
+    cv2.imshow('Edges', img_edgedetect)
     
     # Get Contours 
     img_contours, hierarchy = cv2.findContours(img_edgedetect, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -39,7 +39,7 @@ def get_bounding_quadrangle(img):
         cv2.drawContours(img_with_contours, [img_contours[max_idx]], 0, (0,255,0), 2)
         # cv2.imshow('Contours no hull', img_with_contours)
         cv2.drawContours(img_with_contours, [cv2.convexHull(img_contours[max_idx])], 0, (0,255,0), 2)
-        # cv2.imshow('Contours', img_with_contours)
+        cv2.imshow('Contours', img_with_contours)
     else:
         print("No max contour found")
         return -1
@@ -211,15 +211,15 @@ while True:
         
         #out.write(img_poly_contour)
         
-        # # TESTING: user input for card detection accuracy
-        # user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
-        # user_in = False
-        # while(user_in == False):
-        #     if user_input.isdigit():
-        #         user_input_accurate_frames.append(int(user_input))
-        #         user_in = True
-        #     else:
-        #         user_input = input("Invalid input, please enter a digit between 0-1: ")
+        # TESTING: user input for card detection accuracy
+        user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
+        user_in = False
+        while(user_in == False):
+            if user_input.isdigit():
+                user_input_accurate_frames.append(int(user_input))
+                user_in = True
+            else:
+                user_input = input("Invalid input, please enter a digit between 0-1: ")
         
         # TESTING record if UIN is correct
         if(uin_text == TRUE_UIN):
