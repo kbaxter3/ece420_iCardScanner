@@ -9,6 +9,7 @@ import pytesseract
 
 #%%
 
+# Function that returns the contour of the largest rectangular object in the frame
 def get_bounding_quadrangle(img):
     kernel = np.ones((3,3), np.uint8)
     img_dilate = cv2.dilate(img, kernel, iterations=1)
@@ -53,7 +54,7 @@ def get_bounding_quadrangle(img):
     
     return approx_contour
 
-# From ChatGPT
+# From ChatGPT, use to get all the jpg files in the directory
 def list_jpg_files(directory):
     try:
         # List to hold .jpg filenames
@@ -74,6 +75,7 @@ def list_jpg_files(directory):
         print(f"An error occurred: {e}")
         return []
 
+# Uses tesseract OCR to return all the characters in an image
 def extract_text_from_image(image):
     # Threhold the image
     blur = cv2.GaussianBlur(image,(3,3),0)
@@ -96,10 +98,11 @@ IMG_DIR = 'imgs/'
 
 jpg_names = list_jpg_files(IMG_DIR)
 
-video = cv2.VideoCapture(f'{IMG_DIR}icard0_vid.mp4')
-TRUE_UIN = "659750250" 
+# Change the video to test and the accurate UIN
+video = cv2.VideoCapture(f'{IMG_DIR}icardshiv_moving.mp4')
+TRUE_UIN = "650721817" 
 
-# Set up output video file writer (for presentation)
+# Set up output video file writer (records annotated frames to an mp4 file, for presentation)
 # output_video_path = f'{IMG_DIR}icard0_outputvid_1.mp4'
 # frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
 # frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -121,9 +124,11 @@ false_uin = []
 # for filename in jpg_names:
 #     img = cv2.imread(f"{IMG_DIR}{filename}", cv2.IMREAD_GRAYSCALE)
 
+# Loop through each frame of the bideo
 while True:
     read_success, img_color = video.read()
     if not read_success:
+        # We have reached the last frame of the video
         print('End of video')
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -136,11 +141,12 @@ while True:
         accurate_uin = accurate_uin[1:]
         print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
         print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
-        
-        
+        print(f"False UIN Detection = {sum(false_uin) / len(user_input_accurate_frames)}")
+        print(f"Num frames = {len(user_input_accurate_frames)}")
         
         sys.exit()
-        
+    
+    # Switch to grayscale for processing
     img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
 
     
@@ -225,6 +231,7 @@ while True:
         if(uin_text == TRUE_UIN):
             print("Correct UIN")
             accurate_uin.append(1)
+            false_uin.append(0)
         else: 
             accurate_uin.append(0)
             if(len(uin_text) == len(TRUE_UIN) and uin_text.isdigit()):
