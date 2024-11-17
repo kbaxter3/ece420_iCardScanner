@@ -24,6 +24,7 @@ def get_bounding_quadrangle(img):
     
     img_with_contours = np.ones_like(img, dtype=np.uint8) * 255
     
+    # Find the contour with the maximum area
     max_area = 0
     max_idx = -1
     
@@ -54,28 +55,7 @@ def get_bounding_quadrangle(img):
     
     return approx_contour
 
-# From ChatGPT, use to get all the jpg files in the directory
-def list_jpg_files(directory):
-    try:
-        # List to hold .jpg filenames
-        jpg_files = []
-
-        # Loop through the files in the directory
-        for filename in os.listdir(directory):
-            # Check if the file has a .jpg extension
-            if filename.lower().endswith('.jpg'):
-                jpg_files.append(filename)
-
-        return jpg_files
-
-    except FileNotFoundError:
-        print("The specified directory does not exist.")
-        return []
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return []
-
-# Uses tesseract OCR to return all the characters in an image
+# Uses tesseract OCR to return all the characters in an image, thresholding applied as pre processing for tesseract
 def extract_text_from_image(image):
     # Threhold the image
     blur = cv2.GaussianBlur(image,(3,3),0)
@@ -96,11 +76,13 @@ def extract_text_from_image(image):
 
 IMG_DIR = 'imgs/'
 
-jpg_names = list_jpg_files(IMG_DIR)
+# Video for testing: Change the video to test and the accurate UIN
+video = cv2.VideoCapture(f'{IMG_DIR}icard0_still.mp4')
+TRUE_UIN = "659750250" 
 
-# Change the video to test and the accurate UIN
-video = cv2.VideoCapture(f'{IMG_DIR}icardshiv_moving.mp4')
-TRUE_UIN = "650721817" 
+if not video.isOpened():
+    print('Cannot open video')
+    sys.exit()
 
 # Set up output video file writer (records annotated frames to an mp4 file, for presentation)
 # output_video_path = f'{IMG_DIR}icard0_outputvid_1.mp4'
@@ -109,22 +91,18 @@ TRUE_UIN = "650721817"
 # fps = 2 #video.get(cv2.CAP_PROP_FPS)
 # fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 file
 # out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
-
-
-if not video.isOpened():
-    print('Cannot open video')
-    sys.exit()
     
-# TESTING: variables to store accuracy measurement
-user_input_accurate_frames = []
-accurate_uin = []
-false_uin = []
+# TESTING: variables to store accuracy measurement in each frame
+user_input_accurate_frames = [] # We manually indicate 1 for an accurately detected card and 0 if not
+accurate_uin = [] # Records if text detected in the frame matches the true UIN (1) or not (0)
+false_uin = [] # Records if the text detected contains digits of the expected length of a UIN, but is incorrect (1)
 
     
 # for filename in jpg_names:
 #     img = cv2.imread(f"{IMG_DIR}{filename}", cv2.IMREAD_GRAYSCALE)
 
-# Loop through each frame of the bideo
+# Loop through each frame of the video
+frame_num = 0
 while True:
     read_success, img_color = video.read()
     if not read_success:
@@ -137,14 +115,17 @@ while True:
         #out.release()
         
         # TESTING: accuracy metrics
-        user_input_accurate_frames = user_input_accurate_frames[1:]
-        accurate_uin = accurate_uin[1:]
-        print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
-        print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
-        print(f"False UIN Detection = {sum(false_uin) / len(user_input_accurate_frames)}")
-        print(f"Num frames = {len(user_input_accurate_frames)}")
+        # print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
+        # print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
+        # print(f"False UIN Detection = {sum(false_uin) / len(user_input_accurate_frames)}")
+        # print(f"Num frames = {len(user_input_accurate_frames)}")
         
         sys.exit()
+    # skip the first frame of the video
+    frame_num += 1
+    if(frame_num == 1):
+        continue
+    
     
     # Switch to grayscale for processing
     img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
@@ -176,9 +157,17 @@ while True:
         
         hh, ww = img.shape[:2]
         perspective_img = cv2.warpPerspective(img, M_perspective, (ww,hh))[0:H,0:W]
+        perspective_img_color = cv2.warpPerspective(img_color, M_perspective, (ww,hh))[0:H,0:W]
         
-            
-            
+        # Orient the card putting the orange side to the left
+        cv2.line(perspective_img_color, (W//8,0), (W//8, H), (0,0,255), 2)
+        cv2.imshow("Red Channel", perspective_img_color[0:H, 0:W, 2])
+        red_left = np.sum(perspective_img_color[:, 0:W//8, 2].flatten())
+        red_right = np.sum(perspective_img_color[:, W-W//8:W, 2].flatten())
+        print(f"Red Channel: Ratio = {red_left/red_right}, Left Side= {red_left}, Right Side = {red_right}")
+        if(red_left/red_right < 1):
+            perspective_img = perspective_img[::-1, ::-1]
+        
         # Tesseract text recognition
         # Crop the card to the UIN text
         uin_x_start = (int)(W*2/11)
@@ -190,19 +179,6 @@ while True:
         uin_text = uin_text.replace("\n","")
         cv2.imshow("NetID Cropped", img_uin)
         
-        # If the text identified is not the uin, try flipping the image
-        if(not uin_text.isdigit() or len(uin_text) != 9):
-            perspective_img = perspective_img[::-1, ::-1]
-            img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
-            uin_text = extract_text_from_image(img_uin)
-            uin_text = uin_text.replace("\n","")
-            cv2.imshow("NetID Cropped flipped", img_uin)
-            cv2.imshow('Perspectived', perspective_img)
-            print("rotated")
-            
-            if(not uin_text.isdigit() or len(uin_text) != 9):
-                uin_text = "not found"
-            
             
         # If the text still does not resemble a uin, print no text detected
         if(not uin_text.isdigit() or len(uin_text) != 9):
@@ -218,14 +194,14 @@ while True:
         #out.write(img_poly_contour)
         
         # TESTING: user input for card detection accuracy
-        user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
-        user_in = False
-        while(user_in == False):
-            if user_input.isdigit():
-                user_input_accurate_frames.append(int(user_input))
-                user_in = True
-            else:
-                user_input = input("Invalid input, please enter a digit between 0-1: ")
+        # user_input = input("Enter 1 for correct identification of a card and 0 if not: ")
+        # user_in = False
+        # while(user_in == False):
+        #     if user_input.isdigit():
+        #         user_input_accurate_frames.append(int(user_input))
+        #         user_in = True
+        #     else:
+        #         user_input = input("Invalid input, please enter a digit between 0-1: ")
         
         # TESTING record if UIN is correct
         if(uin_text == TRUE_UIN):
