@@ -8,6 +8,101 @@ import os
 import pytesseract
 
 #%%
+def dist_point_line(x1, y1, x2, y2, x0, y0):
+    return ((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1) / np.sqrt((y2-y1)**2 + (x2-x1)**2)
+
+def quadrangle_approx(orig_contour):
+    # Uses L1 (manhanttan distance) instead of L2 norm (euclidean) since only need ranking, not actual distances
+    distances = np.zeros(len(orig_contour))
+    for i in range(len(orig_contour)):
+        distances[i] = np.abs(orig_contour[i][0][0] - orig_contour[i-1][0][0]) + np.abs(orig_contour[i][0][1] - orig_contour[i-1][0][1])
+
+    # 4 lines, each one is (x1,y1,x2,y2)
+    lines = np.zeros((4,4), dtype=np.int32)
+
+    corners = np.zeros((4,2), dtype=np.int32)
+    slope_array = np.zeros(4)
+    y_int_array = np.zeros(4)
+
+    # Find 4 longest, non-colinear lines in contours (will segments on card edges)
+    COLINEAR_CUTOFF = 10
+    next_line = 0
+    for i in range(len(distances)):
+        max_idx = np.argsort(distances)[-(i+1)]
+
+        # Save the line endpoints
+        lines[next_line][0:2] = orig_contour[max_idx][0]
+        lines[next_line][2:4] = orig_contour[max_idx-1][0]
+
+        slope_denom = (lines[next_line][2]-lines[next_line][0])
+        if (slope_denom == 0):
+            slope = (lines[next_line][3]-lines[next_line][1]) / 0.00001
+        else:
+            slope = (lines[next_line][3]-lines[next_line][1]) / slope_denom
+
+        y_int = lines[next_line][1] - slope * lines[next_line][0]
+
+        # Check if colinear with a line already in our set
+        colinear = False
+        for j in range(next_line):
+            if (dist_point_line(*(lines[j]), lines[next_line][0], lines[next_line][1]) < COLINEAR_CUTOFF and 
+                dist_point_line(*(lines[j]), lines[next_line][2], lines[next_line][3]) < COLINEAR_CUTOFF):
+                colinear = True
+                break
+
+
+        if(not colinear):
+            slope_array[next_line] = slope
+            y_int_array[next_line] = y_int
+
+            next_line += 1
+            if(next_line == 4):
+                break
+
+    # Find opposite opposite to lines[0]
+    if(np.abs(slope_array[0]) < 0.001):
+        slope_array[0] = 0.001
+
+    opposite_idx = 1
+    slope_ratio = np.abs(np.abs(slope_array[1] / slope_array[0]) - 1)
+
+    for i in range(2,4):
+        new_slope_ratio = np.abs(np.abs(slope_array[i] / slope_array[0]) - 1)
+        if(new_slope_ratio < slope_ratio):
+            slope_ratio = new_slope_ratio
+            opposite_idx = i
+
+    # Find 2 line indicies perpendicular to lines[0]
+    if(opposite_idx == 1):
+        adj_idx = np.array((2,3))
+    elif(opposite_idx == 2):
+        adj_idx = np.array((1,3))
+    else:
+        adj_idx = np.array((1,2))
+
+    # Calculate corners
+    for i in range(2):
+        # avoid rounding errors with x_tmp
+        slope_denom = (slope_array[0] - slope_array[adj_idx[i]])
+        if(slope_denom == 0):
+            slope_denom = 0.001
+        x_tmp = (y_int_array[adj_idx[i]] - y_int_array[0]) / slope_denom
+        corners[i][0] = x_tmp
+        corners[i][1] = slope_array[0] * x_tmp + y_int_array[0]
+
+        slope_denom = (slope_array[opposite_idx] - slope_array[adj_idx[i]])
+        if(slope_denom == 0):
+            slope_denom = 0.001
+        x_tmp = (y_int_array[adj_idx[i]] - y_int_array[opposite_idx]) / slope_denom
+        corners[3-i][0] = x_tmp
+        corners[3-i][1] = slope_array[opposite_idx] * x_tmp + y_int_array[opposite_idx]
+    
+    corner_countor = np.zeros((4,1,2), dtype=np.int32)
+    
+    for i in range(4):
+        corner_countor[i][0] = corners[i]
+    
+    return corner_countor
 
 # Function that returns the contour of the largest rectangular object in the frame
 def get_bounding_quadrangle(img):
@@ -45,13 +140,8 @@ def get_bounding_quadrangle(img):
     else:
         print("No max contour found")
         return -1
-        
-    # Apply polygon approximation
-    for err in np.linspace(0.005, 0.09, 80):
-        approx_contour = cv2.approxPolyDP(cv2.convexHull(img_contours[max_idx]), err * cv2.arcLength(img_contours[max_idx], True), True)
-        # print(f"err: {err}, numpt: {approx_contour.shape}")
-        if(approx_contour.shape[0] == 4):
-            break
+
+    approx_contour = quadrangle_approx(cv2.convexHull(img_contours[max_idx]))
     
     return approx_contour
 
@@ -77,8 +167,8 @@ def extract_text_from_image(image):
 IMG_DIR = 'imgs/'
 
 # Video for testing: Change the video to test and the accurate UIN
-video = cv2.VideoCapture(f'{IMG_DIR}icard0_still.mp4')
-TRUE_UIN = "659750250" 
+video = cv2.VideoCapture(f'{IMG_DIR}icard1_moving.mp4')
+TRUE_UIN = "653750367" 
 
 if not video.isOpened():
     print('Cannot open video')
@@ -170,7 +260,7 @@ while True:
         
         # Tesseract text recognition
         # Crop the card to the UIN text
-        uin_x_start = (int)(W*2/11)
+        uin_x_start = (int)(W*20/100)
         uin_width = (int)(W/4)
         uin_y_start = H - (int)(H/10)
         uin_height = (int)(H/10)
