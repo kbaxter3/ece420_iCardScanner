@@ -459,7 +459,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Imgproc.putText(mRgba, "Streaming!", new Point(mRgba.rows() - 25, 35), Core.FONT_HERSHEY_SIMPLEX, 1.5, new Scalar(0, 0, 255), 2);
 
         // Dilate and Canny Edge detect grayscale img
+        Mat dilateKernel = Mat.ones(3,3,CvType.CV_8UC1);
+        dilateKernel.setTo(new Scalar(255));
+
         Imgproc.dilate(mGray, mGray, Mat.ones(3,3,CvType.CV_8UC1));
+
         Imgproc.Canny(mGray, mGray, 100, 200, 3, false);
 
         // Get contours from edge image
