@@ -146,27 +146,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         controlButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (tracking_flag == -1) {
-                    // Modify UI
-                    controlButton.setText("STOP");
-                    widthTextview.setVisibility(View.INVISIBLE);
-                    widthSeekbar.setVisibility(View.INVISIBLE);
-                    heightTextview.setVisibility(View.INVISIBLE);
-                    heightSeekbar.setVisibility(View.INVISIBLE);
-                    // Modify tracking flag
+                if(tracking_flag == 1) {
                     tracking_flag = 0;
-                }
-                else if(tracking_flag == 1){
-                    // Modify UI
-                    controlButton.setText("START");
-                    widthTextview.setVisibility(View.VISIBLE);
-                    widthSeekbar.setVisibility(View.VISIBLE);
-                    heightTextview.setVisibility(View.VISIBLE);
-                    heightSeekbar.setVisibility(View.VISIBLE);
-                    // Tear down myTracker
-                    myTracker.clear();
-                    // Modify tracking flag
-                    tracking_flag = -1;
+                } else {
+                    tracking_flag = 1;
                 }
             }
         });
@@ -377,14 +360,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
 
         // Find opposite opposite to lines[0]
-        if(Math.abs(slope_array[0]) < 0.001) {
-            slope_array[0] = 0.001;
-        }
 
+        // Angle between two slopes - https://www.cuemath.com/geometry/angle-between-two-lines/
+        // Approx arctan as y=x, only need for ranking so don't need exact value, just monotonic increase
         int opposite_idx = 1;
-        double slope_ratio = Math.abs(Math.abs(slope_array[1] / slope_array[0]) - 1);
+        double slope_ratio = Math.abs((slope_array[1] - slope_array[0]) / (1 + slope_array[1]*slope_array[0]) ); // (m1-m2) / (1+m1m2)
+
         for(int i = 1; i < 4; ++i) {
-            double new_slope_ratio = Math.abs(Math.abs(slope_array[i] / slope_array[0]) - 1);
+            double new_slope_ratio = Math.abs((slope_array[i] - slope_array[0]) / (1 + slope_array[i]*slope_array[0]) );
 
             if(new_slope_ratio < slope_ratio){
                 slope_ratio = new_slope_ratio;
@@ -494,15 +477,22 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
         }
 
-        // Draw max hull contour
-        Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+        if(max_area > 0) {
 
-        MatOfPoint quadrangle = new MatOfPoint();
-        quadrangle_approx(max_hull_contour, quadrangle);
+            // Draw max hull contour
+            Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
 
-        Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+            MatOfPoint quadrangle = new MatOfPoint();
+            quadrangle_approx(max_hull_contour, quadrangle);
+
+            Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+        }
 
         // Returned frame will be displayed on the screen
-        return mRgba;
+        if(tracking_flag == 1) {
+            return mGray;
+        } else {
+            return mRgba;
+        }
     }
 }

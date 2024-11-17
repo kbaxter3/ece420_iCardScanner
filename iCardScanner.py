@@ -11,7 +11,7 @@ import pytesseract
 def dist_point_line(x1, y1, x2, y2, x0, y0):
     return ((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1) / np.sqrt((y2-y1)**2 + (x2-x1)**2)
 
-def quadrangle_approx(orig_contour):
+def quadrangle_approx(orig_contour, img_poly_contour_longest_lines):
     # Uses L1 (manhanttan distance) instead of L2 norm (euclidean) since only need ranking, not actual distances
     distances = np.zeros(len(orig_contour))
     for i in range(len(orig_contour)):
@@ -60,14 +60,15 @@ def quadrangle_approx(orig_contour):
                 break
 
     # Find opposite opposite to lines[0]
-    if(np.abs(slope_array[0]) < 0.001):
-        slope_array[0] = 0.001
-
+    # Angle between two slopes - https://www.cuemath.com/geometry/angle-between-two-lines/
+    # Approx arctan as y=x, only need for ranking so don't need exact value, just monotonic increase
     opposite_idx = 1
-    slope_ratio = np.abs(np.abs(slope_array[1] / slope_array[0]) - 1)
+    slope_ratio = np.abs((slope_array[1] - slope_array[0]) / (1 + slope_array[1]*slope_array[0]) ) # (m1-m2) / (1+m1m2)
+    # print(F"slope ratio[1]: {slope_ratio}")
 
     for i in range(2,4):
-        new_slope_ratio = np.abs(np.abs(slope_array[i] / slope_array[0]) - 1)
+        new_slope_ratio = np.abs((slope_array[i] - slope_array[0]) / (1 + slope_array[i]*slope_array[0]) )
+    #     print(F"slope ratio[{i}]: {new_slope_ratio}")
         if(new_slope_ratio < slope_ratio):
             slope_ratio = new_slope_ratio
             opposite_idx = i
@@ -101,11 +102,23 @@ def quadrangle_approx(orig_contour):
     
     for i in range(4):
         corner_countor[i][0] = corners[i]
+        
+    print(f"Slope arr: {slope_array}")
+    print(f"yint arr: {y_int_array}")
+    print(f"opp idx: {opposite_idx}")
+    print(f"Corners: {corners}")
+    print(f"lines: {lines}")
+    
+    for i in range(4):
+        cv2.line(img_poly_contour_longest_lines, lines[i][0:2], lines[i][2:4], (0, 0, 255), 5)
+        if(i == 0 or i == opposite_idx):
+            cv2.line(img_poly_contour_longest_lines, lines[i][0:2], lines[i][2:4], (255, 0, 0), 10)
+        cv2.line(img_poly_contour_longest_lines, corners[i], corners[i-1], (0, 255, 0), 2)
     
     return corner_countor
 
 # Function that returns the contour of the largest rectangular object in the frame
-def get_bounding_quadrangle(img):
+def get_bounding_quadrangle(img, img_poly_contour_longest_lines):
     kernel = np.ones((3,3), np.uint8)
     img_dilate = cv2.dilate(img, kernel, iterations=1)
     # cv2.imshow("Dilate", img_dilate)
@@ -141,9 +154,9 @@ def get_bounding_quadrangle(img):
         print("No max contour found")
         return -1
 
-    approx_contour = quadrangle_approx(cv2.convexHull(img_contours[max_idx]))
+    approx_contour = quadrangle_approx(cv2.convexHull(img_contours[max_idx]), img_poly_contour_longest_lines)
     
-    return approx_contour
+    return (approx_contour, cv2.convexHull(img_contours[max_idx]))
 
 # Uses tesseract OCR to return all the characters in an image, thresholding applied as pre processing for tesseract
 def extract_text_from_image(image):
@@ -195,6 +208,7 @@ false_uin = [] # Records if the text detected contains digits of the expected le
 frame_num = 0
 while True:
     read_success, img_color = video.read()
+    img_backup = img_color.copy()
     if not read_success:
         # We have reached the last frame of the video
         print('End of video')
@@ -212,8 +226,9 @@ while True:
         
         sys.exit()
     # skip the first frame of the video
-    frame_num += 1
-    if(frame_num == 1):
+    NUM_SKIP = 150
+    frame_num += 150
+    if(frame_num == 150):
         continue
     
     
@@ -222,10 +237,11 @@ while True:
 
     
     img_poly_contour = img_color
-    approx_contour = get_bounding_quadrangle(img)
+    approx_contour, orig_contour = get_bounding_quadrangle(img, img_backup)
     
     if(type(approx_contour) == np.ndarray and approx_contour.shape[0] == 4):
         cv2.drawContours(img_poly_contour, [approx_contour], -1, (0,255,0), 2)
+        cv2.drawContours(img_poly_contour, [orig_contour], -1, (0,0,255 ), 2)
         
         # Get top left corner based on side lengths
         vec1 = approx_contour[0,0] - approx_contour[1,0]
@@ -308,6 +324,9 @@ while True:
         
     else:
         print("No card detected")
+        
+    cv2.imshow("orig", img_backup)
+    # cv2.imshow('annotated lines', img_poly_contour_longest_lines)
         
         
     # cv2.waitKey(0)        
