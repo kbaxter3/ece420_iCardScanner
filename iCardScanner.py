@@ -180,8 +180,8 @@ def extract_text_from_image(image):
 IMG_DIR = 'imgs/'
 
 # Video for testing: Change the video to test and the accurate UIN
-video = cv2.VideoCapture(f'{IMG_DIR}icard1_moving.mp4')
-TRUE_UIN = "653750367" 
+video = cv2.VideoCapture(f'{IMG_DIR}icard0_vid.mp4')
+TRUE_UIN = "659750250" 
 
 if not video.isOpened():
     print('Cannot open video')

@@ -24,6 +24,8 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.quickbirdstudios:opencv-contrib:3.4.5'
+    implementation 'cz.adaptech.tesseract4android:tesseract4android:4.7.0'
+
 
     implementation 'androidx.core:core-ktx:1.1.0' // for Android 10
 //    implementation 'androidx.core:core-ktx:1.10.0-alpha01' // for Android 13

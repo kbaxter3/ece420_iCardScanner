@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.Manifest;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -17,6 +18,8 @@ import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import com.googlecode.tesseract.android.TessBaseAPI;
+
 import org.opencv.android.BaseLoaderCallback;
 
 import org.opencv.android.CameraBridgeViewBase;
@@ -25,11 +28,14 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
 import org.opencv.core.Core;
+import org.opencv.core.CvException;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfInt;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect2d;
 
@@ -37,6 +43,7 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.tracking.TrackerKCF;
 
+import java.io.File;
 import java.lang.Math;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -47,6 +54,9 @@ import java.util.stream.IntStream;
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
     private static final String TAG = "MainActivity";
+    private static final int W_PERSPECTIVE = 480;
+    private static final int H_PERSPECTIVE = (int) (W_PERSPECTIVE / 1.6);
+//    private static final MatOfPoint MAT_PERSPECTIVE = new MatOfPoint(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
 
     // UI Variables
     private Button controlButton;
@@ -65,6 +75,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     // Mat to store RGBA and Grayscale camera preview frame
     private Mat mRgba;
     private Mat mGray;
+    private Mat mWarpPersp;
 
     // KCF Tracker variables
     private TrackerKCF myTracker;
@@ -74,6 +85,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private int myROIHeight = 70;
     private Scalar myROIColor = new Scalar(0,0,0);
     private int tracking_flag = -1;
+
+    private TessBaseAPI tess;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,6 +176,29 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
         // Force camera resolution, ignored since OpenCV automatically select best ones
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        // Initialize Tesseract API
+        tess = new TessBaseAPI();
+
+        // Given path must contain subdirectory `tessdata` where are `*.traineddata` language files
+        // The path must be directly readable by the app
+        try{
+            String tessDataPath = new File(getClass().getClassLoader().getResource("tessdata").toURI()).getAbsolutePath();
+
+            if (!tess.init(tessDataPath, "eng")) { // could be multiple languages, like "eng+deu+fra"
+                // Error initializing Tesseract (wrong/inaccessible data path or not existing language file(s))
+                Log.d(TAG, "[ERROR] wrong/inaccessible traineddata file");
+                // Release the native Tesseract instance
+                tess.recycle();
+            }
+
+        } catch (Exception e)
+        {
+            Log.d(TAG, "[ERROR] can't load tessDataPath");
+        }
+
+        Log.d(TAG, "[INFO] tess initialized");
+
     }
 
     @Override
@@ -478,7 +514,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
 
         if(max_area > 0) {
-
             // Draw max hull contour
             Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
 
@@ -486,11 +521,66 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             quadrangle_approx(max_hull_contour, quadrangle);
 
             Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+
+            ///// Orient points to be CW, short edge first
+            Point ptArr[] = quadrangle.toArray();
+            Point vec1, vec2;
+            vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+            vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+
+            // Get CW/CCW by cross product magnitude
+            if(vec1.x * vec2.y - vec1.y * vec2.x > 0) {
+                // If CCW (Positive crossproduct between vec1 x vec2)
+                // Reverse points to make it Clockwise
+                for(int i = 0; i < ptArr.length / 2; i++) {
+                    Point tmp = ptArr[i];
+                    ptArr[i] = ptArr[ptArr.length - i - 1];
+                    ptArr[ptArr.length - i - 1] = tmp;
+                }
+            }
+
+            vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+            vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+            // Check short edge first, if not roll the pts so it is
+            if( (vec1.x * vec1.x + vec1.y * vec1.y) > (vec2.x * vec2.x + vec2.y * vec2.y) ) {
+                Point tmp = ptArr[ptArr.length - 1];
+
+                for (int i = ptArr.length - 1; i > 0; i--) {
+                    ptArr[i] = ptArr[i - 1];
+                }
+
+                ptArr[0] = tmp;
+            }
+
+            // Write back into quadrangle Mat
+            quadrangle.fromArray(ptArr);
+
+            // Find Perspective Transform
+            MatOfPoint2f MAT_PERSPECTIVE = new MatOfPoint2f(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
+            MatOfPoint2f quadrangle_2f = new MatOfPoint2f(quadrangle.toArray());
+            Mat M_perspective = Imgproc.getPerspectiveTransform(quadrangle_2f, MAT_PERSPECTIVE);
+
+            // Apply Perpsective Transform
+            mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
+            Imgproc.warpPerspective(mGray, mWarpPersp, M_perspective, mGray.size());
+
+            // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
+            Bitmap bmp = null;
+            try {
+                //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
+                bmp = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(mRgba, bmp);
+            }
+            catch (CvException e){Log.d("Exception",e.getMessage());}
+
+            tess.setImage(bmp);
+            String text = tess.getUTF8Text();
+            Log.d(TAG, "tesseract output: " + text);
         }
 
         // Returned frame will be displayed on the screen
         if(tracking_flag == 1) {
-            return mGray;
+            return mWarpPersp;
         } else {
             return mRgba;
         }
