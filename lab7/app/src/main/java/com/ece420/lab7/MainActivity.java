@@ -37,6 +37,7 @@ import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Rect2d;
 
 import org.opencv.core.Scalar;
@@ -506,9 +507,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         // Grab camera frame in rgba and grayscale format
         mRgba = inputFrame.rgba();
         // Grab camera frame in gray format
-        mGray = inputFrame.gray();
-
-        Imgproc.putText(mRgba, "Streaming!", new Point(mRgba.rows() - 25, 35), Core.FONT_HERSHEY_SIMPLEX, 1.5, new Scalar(0, 0, 255), 2);
+        mGray = inputFrame.gray().clone();
 
         // Dilate and Canny Edge detect grayscale img
         Mat dilateKernel = Mat.ones(3,3,CvType.CV_8UC1);
@@ -595,19 +594,33 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
             // Apply Perpsective Transform
             mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
-            Imgproc.warpPerspective(mGray, mWarpPersp, M_perspective, mGray.size());
+            Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
+
+            // Orient with the orange stripe on the left
+            
+
+            // Crop Perspective Transformed Image
+            double W = 480;
+            double H = W / 1.6;
+            int x_start = (int)(W * 20 / 100);
+            int y_start = (int)(H - (H / 10));
+            int roi_width = (int)(W / 4);
+            int roi_height = (int)(H / 10);
+            Rect uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+            Mat croppedImage = new Mat(mWarpPersp, uin_roi);
 
             // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
             Bitmap bmp = null;
             try {
                 //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
-                bmp = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.ARGB_8888);
-                Utils.matToBitmap(mRgba, bmp);
+                bmp = Bitmap.createBitmap(croppedImage.cols(), croppedImage.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(croppedImage, bmp);
             }
             catch (CvException e){Log.d("Exception",e.getMessage());}
 
             tess.setImage(bmp);
             String text = tess.getUTF8Text();
+            Imgproc.putText(mRgba, text, new Point(mRgba.rows() - 25, 35), Core.FONT_HERSHEY_SIMPLEX, 1.5, new Scalar(0, 0, 255), 2);
             Log.d(TAG, "tesseract output: " + text);
         }
 
