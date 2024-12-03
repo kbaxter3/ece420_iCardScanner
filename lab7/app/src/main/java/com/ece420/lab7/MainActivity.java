@@ -44,6 +44,9 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.tracking.TrackerKCF;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.Math;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -183,18 +186,48 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         // Given path must contain subdirectory `tessdata` where are `*.traineddata` language files
         // The path must be directly readable by the app
         try{
-            String tessDataPath = new File(getClass().getClassLoader().getResource("tessdata").toURI()).getAbsolutePath();
+            // Path to the app's internal storage directory
+            String tesspath = getFilesDir() + "/tessdata/";
 
-            if (!tess.init(tessDataPath, "eng")) { // could be multiple languages, like "eng+deu+fra"
+            // Create tessdata directory if it doesn't exist
+            File dir = new File(tesspath);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            // File path for the language traineddata file
+            String tessFilepath = tesspath + "eng" + ".traineddata";
+
+            // Check if the file already exists
+            File file = new File(tessFilepath);
+            if (!file.exists()) {
+                InputStream input = getAssets().open("tessdata/" + "eng" + ".traineddata");
+                OutputStream output = new FileOutputStream(tessFilepath);
+
+                // Copy the file
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = input.read(buffer)) > 0) {
+                    output.write(buffer, 0, length);
+                }
+
+                // Close streams
+                output.flush();
+                output.close();
+                input.close();
+            }
+
+            if (!tess.init(getFilesDir().getPath(), "eng")) { // could be multiple languages, like "eng+deu+fra"
                 // Error initializing Tesseract (wrong/inaccessible data path or not existing language file(s))
-                Log.d(TAG, "[ERROR] wrong/inaccessible traineddata file");
+                Log.d(TAG, "[ERROR] wrong/inaccessible traineddata file: " + tessFilepath);
                 // Release the native Tesseract instance
                 tess.recycle();
             }
 
         } catch (Exception e)
         {
-            Log.d(TAG, "[ERROR] can't load tessDataPath");
+            e.printStackTrace();
+            Log.d(TAG, "[ERROR] can't load tessDataPath: " + e.getMessage());
         }
 
         Log.d(TAG, "[INFO] tess initialized");
