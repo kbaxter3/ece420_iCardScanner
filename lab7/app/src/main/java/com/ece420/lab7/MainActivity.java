@@ -2,6 +2,9 @@ package com.ece420.lab7;
 
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.Manifest;
@@ -17,6 +20,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
 
@@ -92,6 +96,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private TessBaseAPI tess;
 
+    private int matches_prev_counter;
+    private String prev_uin;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -165,8 +172,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             public void onClick(View v) {
                 if(tracking_flag == 1) {
                     tracking_flag = 0;
+                    controlButton.setText("Pause");
                 } else {
                     tracking_flag = 1;
+                    controlButton.setText("Resume");
                 }
             }
         });
@@ -180,6 +189,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
         // Force camera resolution, ignored since OpenCV automatically select best ones
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        // Declare string to store previous UIN
+        prev_uin = "";
+        matches_prev_counter = 0;
 
         // Initialize Tesseract API
         tess = new TessBaseAPI();
@@ -495,166 +508,198 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Log.d(TAG, "TrackerKCF onCameraFrame: "+ tracking_flag);
 
-        List<MatOfPoint> img_contours = new ArrayList<>();
-        Mat hierarchy = new Mat();
-
-        double contour_area = 0.0;
-        double max_area = 0.0;
-        MatOfPoint max_hull_contour = new MatOfPoint();
-
-        // Timer
-        long start = Core.getTickCount();
-        // Grab camera frame in rgba and grayscale format
-        mRgba = inputFrame.rgba();
-        // Grab camera frame in gray format
-        mGray = inputFrame.gray().clone();
-
-        // Dilate and Canny Edge detect grayscale img
-        Mat dilateKernel = Mat.ones(3,3,CvType.CV_8UC1);
-        dilateKernel.setTo(new Scalar(255));
-
-        Imgproc.dilate(mGray, mGray, Mat.ones(3,3,CvType.CV_8UC1));
-
-        Imgproc.Canny(mGray, mGray, 100, 200, 3, false);
-
-        // Get contours from edge image
-        Imgproc.findContours(mGray, img_contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-
-        // Find largest contour by area (close using convex hull)
-        for(int i = 0; i < img_contours.size(); i++) {
-            // Get convex hull of contour
-            MatOfInt hull = new MatOfInt();
-            Imgproc.convexHull(img_contours.get(i), hull);
-
-            // Create list of points in convex hull (subset of contour points)
-            Point[] cntr_pts = img_contours.get(i).toArray();
-            List<Point> hull_pts = new ArrayList<Point>();
-            for(int idx : hull.toArray()) {
-                hull_pts.add(cntr_pts[idx]);
-            }
-
-            // Convert list of points to contour
-            MatOfPoint hull_contour = new MatOfPoint();
-            hull_contour.fromList(hull_pts);
-
-            // Calculate hull contour area and overwrite if new max area
-            contour_area = Imgproc.contourArea(hull_contour);
-            if(max_area < contour_area) {
-                max_hull_contour = hull_contour;
-                max_area = contour_area;
-            }
-        }
-
-        if(max_area > 0) {
-            // Draw max hull contour
-            Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
-
-            MatOfPoint quadrangle = new MatOfPoint();
-            quadrangle_approx(max_hull_contour, quadrangle);
-
-            Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
-
-            ///// Orient points to be CW, short edge first
-            Point ptArr[] = quadrangle.toArray();
-            Point vec1, vec2;
-            vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
-            vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
-
-            // Get CW/CCW by cross product magnitude
-            if(vec1.x * vec2.y - vec1.y * vec2.x > 0) {
-                // If CCW (Positive crossproduct between vec1 x vec2)
-                // Reverse points to make it Clockwise
-                for(int i = 0; i < ptArr.length / 2; i++) {
-                    Point tmp = ptArr[i];
-                    ptArr[i] = ptArr[ptArr.length - i - 1];
-                    ptArr[ptArr.length - i - 1] = tmp;
-                }
-            }
-
-            vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
-            vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
-            // Check short edge first, if not roll the pts so it is
-            if( (vec1.x * vec1.x + vec1.y * vec1.y) > (vec2.x * vec2.x + vec2.y * vec2.y) ) {
-                Point tmp = ptArr[ptArr.length - 1];
-
-                for (int i = ptArr.length - 1; i > 0; i--) {
-                    ptArr[i] = ptArr[i - 1];
-                }
-
-                ptArr[0] = tmp;
-            }
-
-            // Write back into quadrangle Mat
-            quadrangle.fromArray(ptArr);
-
-            // Find Perspective Transform
-            MatOfPoint2f MAT_PERSPECTIVE = new MatOfPoint2f(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
-            MatOfPoint2f quadrangle_2f = new MatOfPoint2f(quadrangle.toArray());
-            Mat M_perspective = Imgproc.getPerspectiveTransform(quadrangle_2f, MAT_PERSPECTIVE);
-
-            // Apply Perpsective Transform
-            mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
-            Mat mWarpColor = new Mat();
-            Imgproc.warpPerspective(mRgba, mWarpColor, M_perspective, mRgba.size());
-            Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
-
-
-            // Orient with the orange stripe on the left
-            double left_red_sum = 0;
-            double right_red_sum = 0;
-
-            for(int i = 0; i < W_PERSPECTIVE / 8; i++) {
-                for(int j = 0; j < H_PERSPECTIVE; j++) {
-                    left_red_sum += mWarpColor.get(i,j)[0];
-                    right_red_sum += mWarpColor.get(W_PERSPECTIVE - i,j)[0];
-                }
-            }
-            Mat croppedImage;
-            int x_start, y_start, roi_width, roi_height;
-            Rect uin_roi;
-            if(left_red_sum < right_red_sum) {
-                // Crop Perspective Transformed Image
-                x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
-                y_start = (int)(0);
-                roi_width = (int)(W_PERSPECTIVE / 4);
-                roi_height = (int)(H_PERSPECTIVE / 10);
-                uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
-                croppedImage = new Mat(mWarpPersp, uin_roi);
-
-                Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
-            }
-            else{
-                // Crop Perspective Transformed Image
-                x_start = (int)(W_PERSPECTIVE * 20 / 100);
-                y_start = (int)(H_PERSPECTIVE  - (H_PERSPECTIVE / 10));
-                roi_width = (int)(W_PERSPECTIVE / 4);
-                roi_height = (int)(H_PERSPECTIVE / 10);
-                uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
-                croppedImage = new Mat(mWarpPersp, uin_roi);
-            }
-
-            Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
-
-
-            // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
-            Bitmap bmp = null;
-            try {
-                //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
-                bmp = Bitmap.createBitmap(croppedImage.cols(), croppedImage.rows(), Bitmap.Config.ARGB_8888);
-                Utils.matToBitmap(croppedImage, bmp);
-            }
-            catch (CvException e){Log.d("Exception",e.getMessage());}
-
-            tess.setImage(bmp);
-            String text = tess.getUTF8Text();
-            Imgproc.putText(mRgba, text, new Point(mRgba.rows() - 25, 45), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(255, 255, 255), 2);
-            Log.d(TAG, "tesseract output: " + text);
-        }
-
         // Returned frame will be displayed on the screen
         if(tracking_flag == 1) {
-            return mWarpPersp;
+            return mRgba;
         } else {
+            List<MatOfPoint> img_contours = new ArrayList<>();
+            Mat hierarchy = new Mat();
+
+            double contour_area = 0.0;
+            double max_area = 0.0;
+            MatOfPoint max_hull_contour = new MatOfPoint();
+
+            // Timer
+            long start = Core.getTickCount();
+            // Grab camera frame in rgba and grayscale format
+            mRgba = inputFrame.rgba();
+            // Grab camera frame in gray format
+            mGray = inputFrame.gray().clone();
+
+            // Dilate and Canny Edge detect grayscale img
+            Mat dilateKernel = Mat.ones(3,3,CvType.CV_8UC1);
+            dilateKernel.setTo(new Scalar(255));
+
+            Imgproc.dilate(mGray, mGray, Mat.ones(3,3,CvType.CV_8UC1));
+
+            Imgproc.Canny(mGray, mGray, 100, 200, 3, false);
+
+            // Get contours from edge image
+            Imgproc.findContours(mGray, img_contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+
+            // Find largest contour by area (close using convex hull)
+            for(int i = 0; i < img_contours.size(); i++) {
+                // Get convex hull of contour
+                MatOfInt hull = new MatOfInt();
+                Imgproc.convexHull(img_contours.get(i), hull);
+
+                // Create list of points in convex hull (subset of contour points)
+                Point[] cntr_pts = img_contours.get(i).toArray();
+                List<Point> hull_pts = new ArrayList<Point>();
+                for(int idx : hull.toArray()) {
+                    hull_pts.add(cntr_pts[idx]);
+                }
+
+                // Convert list of points to contour
+                MatOfPoint hull_contour = new MatOfPoint();
+                hull_contour.fromList(hull_pts);
+
+                // Calculate hull contour area and overwrite if new max area
+                contour_area = Imgproc.contourArea(hull_contour);
+                if(max_area < contour_area) {
+                    max_hull_contour = hull_contour;
+                    max_area = contour_area;
+                }
+            }
+
+            if(max_area > 0) {
+                // Draw max hull contour
+                Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+
+                MatOfPoint quadrangle = new MatOfPoint();
+                quadrangle_approx(max_hull_contour, quadrangle);
+
+                Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+
+                ///// Orient points to be CW, short edge first
+                Point ptArr[] = quadrangle.toArray();
+                Point vec1, vec2;
+                vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+                vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+
+                // Get CW/CCW by cross product magnitude
+                if(vec1.x * vec2.y - vec1.y * vec2.x > 0) {
+                    // If CCW (Positive crossproduct between vec1 x vec2)
+                    // Reverse points to make it Clockwise
+                    for(int i = 0; i < ptArr.length / 2; i++) {
+                        Point tmp = ptArr[i];
+                        ptArr[i] = ptArr[ptArr.length - i - 1];
+                        ptArr[ptArr.length - i - 1] = tmp;
+                    }
+                }
+
+                vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+                vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+                // Check short edge first, if not roll the pts so it is
+                if( (vec1.x * vec1.x + vec1.y * vec1.y) > (vec2.x * vec2.x + vec2.y * vec2.y) ) {
+                    Point tmp = ptArr[ptArr.length - 1];
+
+                    for (int i = ptArr.length - 1; i > 0; i--) {
+                        ptArr[i] = ptArr[i - 1];
+                    }
+
+                    ptArr[0] = tmp;
+                }
+
+                // Write back into quadrangle Mat
+                quadrangle.fromArray(ptArr);
+
+                // Find Perspective Transform
+                MatOfPoint2f MAT_PERSPECTIVE = new MatOfPoint2f(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
+                MatOfPoint2f quadrangle_2f = new MatOfPoint2f(quadrangle.toArray());
+                Mat M_perspective = Imgproc.getPerspectiveTransform(quadrangle_2f, MAT_PERSPECTIVE);
+
+                // Apply Perpsective Transform
+                mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
+                Mat mWarpColor = new Mat();
+                Imgproc.warpPerspective(mRgba, mWarpColor, M_perspective, mRgba.size());
+                Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
+
+
+                // Orient with the orange stripe on the left
+                double left_red_sum = 0;
+                double right_red_sum = 0;
+
+                for(int i = 0; i < W_PERSPECTIVE / 8; i++) {
+                    for(int j = 0; j < H_PERSPECTIVE; j++) {
+                        left_red_sum += mWarpColor.get(i,j)[0];
+                        right_red_sum += mWarpColor.get(W_PERSPECTIVE - i,j)[0];
+                    }
+                }
+                Mat croppedImage;
+                int x_start, y_start, roi_width, roi_height;
+                Rect uin_roi;
+                if(left_red_sum < right_red_sum) {
+                    // Crop Perspective Transformed Image
+                    x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
+                    y_start = (int)(0);
+                    roi_width = (int)(W_PERSPECTIVE / 4);
+                    roi_height = (int)(H_PERSPECTIVE / 10);
+                    uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+                    croppedImage = new Mat(mWarpPersp, uin_roi);
+
+                    Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
+                }
+                else{
+                    // Crop Perspective Transformed Image
+                    x_start = (int)(W_PERSPECTIVE * 20 / 100);
+                    y_start = (int)(H_PERSPECTIVE  - (H_PERSPECTIVE / 10));
+                    roi_width = (int)(W_PERSPECTIVE / 4);
+                    roi_height = (int)(H_PERSPECTIVE / 10);
+                    uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+                    croppedImage = new Mat(mWarpPersp, uin_roi);
+                }
+
+                Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
+
+
+                // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
+                Bitmap bmp = null;
+                try {
+                    //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
+                    bmp = Bitmap.createBitmap(croppedImage.cols(), croppedImage.rows(), Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(croppedImage, bmp);
+                }
+                catch (CvException e){Log.d("Exception", e.getMessage());}
+
+                tess.setImage(bmp);
+                String text = tess.getUTF8Text();
+                Imgproc.putText(mRgba, "UIN: "+ text, new Point(mRgba.rows() - 35, 60), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(0, 255, 0), 3);
+                Log.d(TAG, "tesseract output: " + text);
+
+                if(text.length() == 9 ) {
+                    boolean isDigitsOnly = true;
+                    for (int i = 0; i < text.length(); i++) {
+                        if (!Character.isDigit(text.charAt(i))) {
+                            isDigitsOnly = false;
+                            break;
+                        }
+                    }
+
+                    if(isDigitsOnly) {
+                        if(prev_uin.equals(text)) {
+                            matches_prev_counter++;
+                        }
+                        else {
+                            matches_prev_counter = 0;
+                            prev_uin = text;
+                        }
+
+                        if(matches_prev_counter >= 2) {
+                            // Copy to clipboard (Chat GPT)
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            ClipData clip = ClipData.newPlainText("label", text);
+                            // Set the clip data to the clipboard
+                            clipboard.setPrimaryClip(clip);
+
+                            controlButton.setText("Rescan+");
+                            tracking_flag = 1;
+                            matches_prev_counter = 0;
+                            prev_uin = "";
+                        }
+                    }
+                }
+            }
             return mRgba;
         }
     }
