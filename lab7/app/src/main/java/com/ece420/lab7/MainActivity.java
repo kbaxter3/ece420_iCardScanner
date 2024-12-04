@@ -633,6 +633,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 croppedImage = new Mat(mWarpPersp, uin_roi);
             }
 
+            Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
+
 
             // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
             Bitmap bmp = null;
@@ -645,7 +647,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
             tess.setImage(bmp);
             String text = tess.getUTF8Text();
-            Imgproc.putText(mRgba, text, new Point(mRgba.rows() - 25, 35), Core.FONT_HERSHEY_SIMPLEX, 1.5, new Scalar(0, 0, 255), 2);
+            Imgproc.putText(mRgba, text, new Point(mRgba.rows() - 25, 45), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(255, 255, 255), 2);
             Log.d(TAG, "tesseract output: " + text);
         }
 
