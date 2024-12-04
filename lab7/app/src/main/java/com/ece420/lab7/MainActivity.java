@@ -594,20 +594,45 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
             // Apply Perpsective Transform
             mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
+            Mat mWarpColor = new Mat();
+            Imgproc.warpPerspective(mRgba, mWarpColor, M_perspective, mRgba.size());
             Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
 
-            // Orient with the orange stripe on the left
-            
 
-            // Crop Perspective Transformed Image
-            double W = 480;
-            double H = W / 1.6;
-            int x_start = (int)(W * 20 / 100);
-            int y_start = (int)(H - (H / 10));
-            int roi_width = (int)(W / 4);
-            int roi_height = (int)(H / 10);
-            Rect uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
-            Mat croppedImage = new Mat(mWarpPersp, uin_roi);
+            // Orient with the orange stripe on the left
+            double left_red_sum = 0;
+            double right_red_sum = 0;
+
+            for(int i = 0; i < W_PERSPECTIVE / 8; i++) {
+                for(int j = 0; j < H_PERSPECTIVE; j++) {
+                    left_red_sum += mWarpColor.get(i,j)[0];
+                    right_red_sum += mWarpColor.get(W_PERSPECTIVE - i,j)[0];
+                }
+            }
+            Mat croppedImage;
+            int x_start, y_start, roi_width, roi_height;
+            Rect uin_roi;
+            if(left_red_sum < right_red_sum) {
+                // Crop Perspective Transformed Image
+                x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
+                y_start = (int)(0);
+                roi_width = (int)(W_PERSPECTIVE / 4);
+                roi_height = (int)(H_PERSPECTIVE / 10);
+                uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+                croppedImage = new Mat(mWarpPersp, uin_roi);
+
+                Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
+            }
+            else{
+                // Crop Perspective Transformed Image
+                x_start = (int)(W_PERSPECTIVE * 20 / 100);
+                y_start = (int)(H_PERSPECTIVE  - (H_PERSPECTIVE / 10));
+                roi_width = (int)(W_PERSPECTIVE / 4);
+                roi_height = (int)(H_PERSPECTIVE / 10);
+                uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+                croppedImage = new Mat(mWarpPersp, uin_roi);
+            }
+
 
             // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
             Bitmap bmp = null;
