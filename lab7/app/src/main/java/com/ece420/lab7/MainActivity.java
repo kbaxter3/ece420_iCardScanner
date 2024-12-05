@@ -48,9 +48,12 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.tracking.TrackerKCF;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.Math;
 import java.util.Arrays;
@@ -100,6 +103,39 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private int matches_prev_counter;
     private String prev_uin;
+
+    // https://javapapers.com/android/android-read-csv-file/
+    public class CSVFile {
+        InputStream inputStream;
+
+        public CSVFile(InputStream inputStream){
+            this.inputStream = inputStream;
+        }
+
+        public List read(){
+            List resultList = new ArrayList();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            try {
+                String csvLine;
+                while ((csvLine = reader.readLine()) != null) {
+                    String[] row = csvLine.split(",");
+                    resultList.add(row);
+                }
+            }
+            catch (IOException ex) {
+                throw new RuntimeException("Error in reading CSV file: "+ex);
+            }
+            finally {
+                try {
+                    inputStream.close();
+                }
+                catch (IOException e) {
+                    throw new RuntimeException("Error while closing input stream: "+e);
+                }
+            }
+            return resultList;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -733,6 +769,31 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                             tracking_flag = 1;
                             matches_prev_counter = 0;
                             prev_uin = "";
+
+                            // Check against database
+                            boolean has_access = false;
+                            InputStream is = getResources().openRawResource(R.raw.lab_access_log);
+                            CSVFile csv_file = new CSVFile(is);
+
+                            List list = csv_file.read();
+                            String[] l;
+                            for (int i = 0; i < list.size(); i++) {
+                                l = (String[]) list.get(i);
+                                for (int j = 0; j < l.length; j++) {
+                                    if(l[j].equals(text)) {
+                                        has_access = true;
+                                        break;
+                                    }
+                                }
+
+
+                            }
+
+                            if(has_access) {
+                                Imgproc.putText(mRgba, "Has lab access!", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+                            } else {
+                                Imgproc.putText(mRgba, "Doesn't have lab access", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+                            }
                         }
                     }
                 }
@@ -741,3 +802,5 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 }
+
+
