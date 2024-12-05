@@ -57,6 +57,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -627,8 +629,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     }
                 }
                 Mat croppedImage;
+                Mat nameCropImg;
                 int x_start, y_start, roi_width, roi_height;
+                int name_x_start, name_y_start, name_roi_width, name_roi_height;
                 Rect uin_roi;
+                Rect name_roi;
                 if(left_red_sum < right_red_sum) {
                     // Crop Perspective Transformed Image
                     x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
@@ -636,9 +641,18 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     roi_width = (int)(W_PERSPECTIVE / 4);
                     roi_height = (int)(H_PERSPECTIVE / 10);
                     uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+
+                    name_x_start = (int)(W_PERSPECTIVE * (1 - 13 / 100 - 8/10) );
+                    name_y_start = (int)(H_PERSPECTIVE * (1 - 73/100 - 1/10) );
+                    name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
+                    name_roi_height = (int)(H_PERSPECTIVE / 10);
+                    name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
+
                     croppedImage = new Mat(mWarpPersp, uin_roi);
+                    nameCropImg  = new Mat(mWarpPersp, name_roi);
 
                     Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
+                    Core.rotate(nameCropImg, nameCropImg, Core.ROTATE_180);
                 }
                 else{
                     // Crop Perspective Transformed Image
@@ -647,7 +661,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     roi_width = (int)(W_PERSPECTIVE / 4);
                     roi_height = (int)(H_PERSPECTIVE / 10);
                     uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+
+                    name_x_start = (int)(W_PERSPECTIVE * 13 / 100 );
+                    name_y_start = (int)(H_PERSPECTIVE * 73/100 );
+                    name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
+                    name_roi_height = (int)(H_PERSPECTIVE / 10);
+                    name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
+
                     croppedImage = new Mat(mWarpPersp, uin_roi);
+                    nameCropImg  = new Mat(mWarpPersp, name_roi);
                 }
 
                 Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
@@ -666,6 +688,21 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 String text = tess.getUTF8Text();
                 Imgproc.putText(mRgba, "UIN: "+ text, new Point(mRgba.rows() - 35, 60), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(0, 255, 0), 3);
                 Log.d(TAG, "tesseract output: " + text);
+
+                Bitmap bmp2 = null;
+                try {
+                    //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
+                    bmp2 = Bitmap.createBitmap(nameCropImg.cols(), nameCropImg.rows(), Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(nameCropImg, bmp2);
+                }
+                catch (CvException e){Log.d("Exception", e.getMessage());}
+
+                tess.setImage(bmp2);
+
+                String nameText = tess.getUTF8Text();
+                nameText = nameText.replaceAll("^[^A-Z]*|[^A-Z]*$", "");
+                Imgproc.putText(mRgba, "Name: "+ nameText, new Point(35, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+                Log.d(TAG, "Name output: " + nameText);
 
                 if(text.length() == 9 ) {
                     boolean isDigitsOnly = true;
@@ -688,7 +725,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         if(matches_prev_counter >= 2) {
                             // Copy to clipboard (Chat GPT)
                             ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                            ClipData clip = ClipData.newPlainText("label", text);
+                            ClipData clip = ClipData.newPlainText("label", nameText + '\n'+  text);
                             // Set the clip data to the clipboard
                             clipboard.setPrimaryClip(clip);
 

@@ -165,7 +165,7 @@ def extract_text_from_image(image):
     ret3,img_uin = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
     # Convert the image to RGB (Tesseract requires RGB images)
-    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    rgb_image = cv2.cvtColor(img_uin, cv2.COLOR_BGR2RGB)
 
     # Use Tesseract to extract text, signle line mode (psm7)
     text = pytesseract.image_to_string(rgb_image, config='--psm 7')
@@ -280,10 +280,22 @@ while True:
         uin_width = (int)(W/4)
         uin_y_start = H - (int)(H/10)
         uin_height = (int)(H/10)
+        
+        # crop the card to the name text
+        name_x_start = (int)(W*13/100)
+        name_width = (int)(W * 8/10)
+        name_y_start = (int) (H * (1 - 27/100))
+        name_height = (int)(H/10)
+        
         img_uin = perspective_img[uin_y_start : uin_y_start + uin_height, uin_x_start : uin_x_start + uin_width]
         uin_text = extract_text_from_image(img_uin)
         uin_text = uin_text.replace("\n","")
         cv2.imshow("NetID Cropped", img_uin)
+        
+        img_name = perspective_img[name_y_start : name_y_start + name_height, name_x_start : name_x_start + name_width]
+        name_text = extract_text_from_image(img_name)
+        name_text = name_text.replace("\n","")
+        cv2.imshow("Name Cropped", img_name)
         
             
         # If the text still does not resemble a uin, print no text detected
@@ -293,6 +305,7 @@ while True:
         print(f"UIN: {uin_text}, length: {len(uin_text)}")
         
         cv2.putText(img_poly_contour, f"UIN: {uin_text}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
+        cv2.putText(img_poly_contour, f"Name: {name_text}", (300, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
         
         cv2.imshow('Perspectived', perspective_img)
         cv2.imshow("Annotated", img_poly_contour)
