@@ -79,6 +79,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 //k    private TextView widthTextview;
 //k    private TextView heightTextview;
     private TextView labAccessTextview;
+    private TextView uinTextview;
+    private TextView nameTextview;
 
     // Declare OpenCV based camera view base
     private CameraBridgeViewBase mOpenCvCameraView;
@@ -158,6 +160,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
         // Setup Lab Access TextView
         labAccessTextview = (TextView) findViewById(R.id.labAccessTextView);
+        uinTextview = (TextView) findViewById(R.id.uinTextView);
+        nameTextview = (TextView) findViewById(R.id.nameTextView);
 //        // Setup color seek bar
 //        colorSeekbar = (SeekBar) findViewById(R.id.colorSeekBar);
 //        colorSeekbar.setProgress(50);
@@ -550,7 +554,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Log.d(TAG, "onCameraFrame: "+ tracking_flag);
         String labAccessMessage = "Lab Access: ";
-
+        String text = "";
+        String nameText = "";
         // Returned frame will be displayed on the screen
         if(tracking_flag == 1) {
             return mRgba;
@@ -726,8 +731,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 catch (CvException e){Log.d("Exception", e.getMessage());}
 
                 tess.setImage(bmp);
-                String text = tess.getUTF8Text();
-                Imgproc.putText(mRgba, "UIN: "+ text, new Point(mRgba.rows() - 35, 60), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(0, 255, 0), 3);
+                text = tess.getUTF8Text();
+//                Imgproc.putText(mRgba, "UIN: "+ text, new Point(mRgba.rows() - 35, 60), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(0, 255, 0), 3);
                 Log.d(TAG, "tesseract output: " + text);
 
                 Bitmap bmp2 = null;
@@ -740,9 +745,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
                 tess.setImage(bmp2);
 
-                String nameText = tess.getUTF8Text();
+                nameText = tess.getUTF8Text();
                 nameText = nameText.replaceAll("^[^A-Z]*|[^A-Z]*$", "");
-                Imgproc.putText(mRgba, "Name: "+ nameText, new Point(35, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+//                Imgproc.putText(mRgba, "Name: "+ nameText, new Point(35, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
                 Log.d(TAG, "Name output: " + nameText);
 
                 if(text.length() == 9 ) {
@@ -809,15 +814,21 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
 
             class TempTask implements Runnable {
-                String str;
-                TempTask(String s) {str = s; }
+                String str1;
+                String str2;
+                String str3;
+                TempTask(String s1,String s2,String s3) {str1 = s1; str2 = s2; str3 = s3;}
                 public void run() {
-                    TextView labTextView = (TextView) findViewById(R.id.labAccessTextView);
-                    labTextView.setText(str);
+                    TextView TextView1 = (TextView) findViewById(R.id.labAccessTextView);
+                    TextView1.setText(str1);
+                    TextView TextView2 = (TextView) findViewById(R.id.uinTextView);
+                    TextView2.setText(str2);
+                    TextView TextView3 = (TextView) findViewById(R.id.nameTextView);
+                    TextView3.setText(str3);
                 }
             }
 
-            MainActivity.this.runOnUiThread(new TempTask(labAccessMessage));
+            MainActivity.this.runOnUiThread(new TempTask(labAccessMessage, "UIN: " + text, "Name: " + nameText));
 
             return mRgba;
         }

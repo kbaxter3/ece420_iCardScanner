@@ -12,12 +12,12 @@
     <TextView
         android:id="@+id/labAccessTextView"
         android:layout_width="wrap_content"
-        android:layout_height="60dp"
+        android:layout_height="wrap_content"
         android:layout_below="@+id/controlButton"
         android:layout_alignStart="@+id/controlButton"
         android:layout_alignParentEnd="true"
         android:layout_marginStart="0dp"
-        android:layout_marginTop="13dp"
+        android:layout_marginTop="10dp"
         android:layout_marginEnd="0dp"
         android:text="Lab Access: " />
 
@@ -50,10 +50,30 @@
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="50dp"
+        android:layout_marginTop="0dp"
         android:width="130dp"
         android:height="60dp"
         android:text="@string/control_button" />
+
+    <TextView
+        android:id="@+id/uinTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/labAccessTextView"
+        android:layout_alignStart="@+id/controlButton"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="0dp"
+        android:text="UIN: " />
+
+    <TextView
+        android:id="@+id/nameTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/uinTextView"
+        android:layout_alignStart="@id/controlButton"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="0dp"
+        android:text="TextView" />
 
     <!--        android:textAppearance="@style/TextAppearance.AppCompat.Medium"-->
 
