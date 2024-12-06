@@ -75,6 +75,15 @@
         android:layout_marginEnd="0dp"
         android:text="TextView" />
 
+    <Button
+        android:id="@+id/clipboardButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/nameTextView"
+        android:layout_alignStart="@id/controlButton"
+        android:layout_marginTop="10dp"
+        android:text="Copy" />
+
     <!--        android:textAppearance="@style/TextAppearance.AppCompat.Medium"-->
 
     <!--        android:textAppearance="@style/TextAppearance.AppCompat.Medium"-->

@@ -73,6 +73,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     // UI Variables
     private Button controlButton;
+    private Button clipboardButton;
 //k    private SeekBar colorSeekbar;
 //k    private SeekBar widthSeekbar;
 //k    private SeekBar heightSeekbar;
@@ -81,6 +82,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private TextView labAccessTextview;
     private TextView uinTextview;
     private TextView nameTextview;
+    private String nameText;
+    private String text;
 
     // Declare OpenCV based camera view base
     private CameraBridgeViewBase mOpenCvCameraView;
@@ -225,6 +228,21 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 }
             }
         });
+
+
+        // Setup clipboard button
+        clipboardButton = (Button)findViewById((R.id.clipboardButton));
+        clipboardButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Copy to clipboard (Chat GPT)
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("label", nameText + '\n'+  text);
+                // Set the clip data to the clipboard
+                clipboard.setPrimaryClip(clip);
+            }
+        });
+
 
         // Setup OpenCV Camera View
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.opencv_camera_preview);
@@ -554,8 +572,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Log.d(TAG, "onCameraFrame: "+ tracking_flag);
         String labAccessMessage = "Lab Access: ";
-        String text = "";
-        String nameText = "";
         // Returned frame will be displayed on the screen
         if(tracking_flag == 1) {
             return mRgba;
@@ -769,11 +785,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         }
 
                         if(matches_prev_counter >= 2) {
-                            // Copy to clipboard (Chat GPT)
-                            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                            ClipData clip = ClipData.newPlainText("label", nameText + '\n'+  text);
-                            // Set the clip data to the clipboard
-                            clipboard.setPrimaryClip(clip);
+
 
                             controlButton.setText("Rescan+");
                             tracking_flag = 1;
