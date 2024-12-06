@@ -82,6 +82,8 @@
         android:layout_below="@id/nameTextView"
         android:layout_alignStart="@id/controlButton"
         android:layout_marginTop="10dp"
+        android:width="130dp"
+        android:height="60dp"
         android:text="Copy" />
 
     <!--        android:textAppearance="@style/TextAppearance.AppCompat.Medium"-->

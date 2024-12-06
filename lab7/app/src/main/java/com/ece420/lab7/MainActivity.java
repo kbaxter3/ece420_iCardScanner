@@ -1,6 +1,7 @@
 package com.ece420.lab7;
 
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -148,7 +149,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
-        super.setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        super.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
+        // To hide action bar
+        try {
+            ActionBar actionBar = getActionBar();
+            actionBar.hide();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         // Request User Permission on Camera
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_DENIED){
@@ -787,7 +796,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         if(matches_prev_counter >= 2) {
 
 
-                            controlButton.setText("Rescan+");
+                            controlButton.setText("Rescan");
                             tracking_flag = 1;
                             matches_prev_counter = 0;
                             prev_uin = "";
