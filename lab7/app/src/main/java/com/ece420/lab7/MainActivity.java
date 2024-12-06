@@ -73,11 +73,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     // UI Variables
     private Button controlButton;
-    private SeekBar colorSeekbar;
-    private SeekBar widthSeekbar;
-    private SeekBar heightSeekbar;
-    private TextView widthTextview;
-    private TextView heightTextview;
+//k    private SeekBar colorSeekbar;
+//k    private SeekBar widthSeekbar;
+//k    private SeekBar heightSeekbar;
+//k    private TextView widthTextview;
+//k    private TextView heightTextview;
+    private TextView labAccessTextview;
 
     // Declare OpenCV based camera view base
     private CameraBridgeViewBase mOpenCvCameraView;
@@ -155,56 +156,59 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Log.d(this.getClass().getSimpleName(), "  OpenCVLoader.initDebug(), working.");
         }
 
-        // Setup color seek bar
-        colorSeekbar = (SeekBar) findViewById(R.id.colorSeekBar);
-        colorSeekbar.setProgress(50);
-        setColor(50);
-        colorSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-        {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-            {
-                setColor(progress);
-            }
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
-        // Setup width seek bar
-        widthTextview = (TextView) findViewById(R.id.widthTextView);
-        widthSeekbar = (SeekBar) findViewById(R.id.widthSeekBar);
-        widthSeekbar.setProgress(myROIWidth - 20);
-        widthSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-        {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-            {
-                // Only allow modification when not tracking
-                if(tracking_flag == -1) {
-                    myROIWidth = progress + 20;
-                }
-            }
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
-        // Setup width seek bar
-        heightTextview = (TextView) findViewById(R.id.heightTextView);
-        heightSeekbar = (SeekBar) findViewById(R.id.heightSeekBar);
-        heightSeekbar.setProgress(myROIHeight - 20);
-        heightSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-        {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-            {
-                // Only allow modification when not tracking
-                if(tracking_flag == -1) {
-                    myROIHeight = progress + 20;
-                }
-            }
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
+        // Setup Lab Access TextView
+        labAccessTextview = (TextView) findViewById(R.id.labAccessTextView);
+//        // Setup color seek bar
+//        colorSeekbar = (SeekBar) findViewById(R.id.colorSeekBar);
+//        colorSeekbar.setProgress(50);
+//        setColor(50);
+//        colorSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
+//        {
+//            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
+//            {
+//                setColor(progress);
+//            }
+//            public void onStartTrackingTouch(SeekBar seekBar) {}
+//            public void onStopTrackingTouch(SeekBar seekBar) {}
+//        });
+//
+//        // Setup width seek bar
+//        widthTextview = (TextView) findViewById(R.id.widthTextView);
+//        widthSeekbar = (SeekBar) findViewById(R.id.widthSeekBar);
+//        widthSeekbar.setProgress(myROIWidth - 20);
+//        widthSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
+//        {
+//            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
+//            {
+//                // Only allow modification when not tracking
+//                if(tracking_flag == -1) {
+//                    myROIWidth = progress + 20;
+//                }
+//            }
+//            public void onStartTrackingTouch(SeekBar seekBar) {}
+//            public void onStopTrackingTouch(SeekBar seekBar) {}
+//        });
+//k
+//k        // Setup width seek bar
+//k        heightTextview = (TextView) findViewById(R.id.heightTextView);
+//k        heightSeekbar = (SeekBar) findViewById(R.id.heightSeekBar);
+//k        heightSeekbar.setProgress(myROIHeight - 20);
+//k        heightSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
+//k        {
+//k            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
+//k            {
+//k                // Only allow modification when not tracking
+//k               if(tracking_flag == -1) {
+//k                   myROIHeight = progress + 20;
+//k                }
+//k            }
+//k            public void onStartTrackingTouch(SeekBar seekBar) {}
+//k            public void onStopTrackingTouch(SeekBar seekBar) {}
+//k        });
 
         // Setup control button
         controlButton = (Button)findViewById((R.id.controlButton));
+        controlButton.setText("Pause");
         controlButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -544,7 +548,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Log.d(TAG, "TrackerKCF onCameraFrame: "+ tracking_flag);
+        Log.d(TAG, "onCameraFrame: "+ tracking_flag);
+        String labAccessMessage = "Lab Access: ";
 
         // Returned frame will be displayed on the screen
         if(tracking_flag == 1) {
@@ -788,16 +793,32 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
                             }
-
+                            String labAccessDisplay;
                             if(has_access) {
-                                Imgproc.putText(mRgba, "Has lab access!", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+                                labAccessMessage = "Lab Access: Yes";
+//                                Imgproc.putText(mRgba, "Has lab access!", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
                             } else {
-                                Imgproc.putText(mRgba, "Doesn't have lab access", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+                                labAccessMessage = "Lab Access: No";
+//                                Imgproc.putText(mRgba, "Doesn't have lab access", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
                             }
+
+
                         }
                     }
                 }
             }
+
+            class TempTask implements Runnable {
+                String str;
+                TempTask(String s) {str = s; }
+                public void run() {
+                    TextView labTextView = (TextView) findViewById(R.id.labAccessTextView);
+                    labTextView.setText(str);
+                }
+            }
+
+            MainActivity.this.runOnUiThread(new TempTask(labAccessMessage));
+
             return mRgba;
         }
     }
