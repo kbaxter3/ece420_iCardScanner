@@ -110,6 +110,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private int matches_prev_counter;
     private String prev_uin;
+    private long start_time; // for testing purposes
 
     // https://javapapers.com/android/android-read-csv-file/
     public class CSVFile {
@@ -231,6 +232,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 if(tracking_flag == 1) {
                     tracking_flag = 0;
                     controlButton.setText("Pause");
+
+                    // Timer
+                    start_time = Core.getTickCount();
+
                 } else {
                     tracking_flag = 1;
                     controlButton.setText("Resume");
@@ -795,6 +800,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
                         if(matches_prev_counter >= 2) {
 
+                            // Record time to detection for testing
+                            double time_to_detect = (Core.getTickCount() - start_time) / Core.getTickFrequency();
+                            Imgproc.putText(mRgba, "Time: " + time_to_detect, new Point(10, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
 
                             controlButton.setText("Rescan");
                             tracking_flag = 1;

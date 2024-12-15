@@ -170,7 +170,7 @@ def extract_text_from_image(image):
     # Use Tesseract to extract text, signle line mode (psm7)
     text = pytesseract.image_to_string(rgb_image, config='--psm 7')
     
-    cv2.imshow("thresh_crop", img_uin)
+    cv2.imshow("thresh_crop" + str(image), img_uin)
 
     return text
 
@@ -200,41 +200,41 @@ user_input_accurate_frames = [] # We manually indicate 1 for an accurately detec
 accurate_uin = [] # Records if text detected in the frame matches the true UIN (1) or not (0)
 false_uin = [] # Records if the text detected contains digits of the expected length of a UIN, but is incorrect (1)
 
-    
-# for filename in jpg_names:
-#     img = cv2.imread(f"{IMG_DIR}{filename}", cv2.IMREAD_GRAYSCALE)
+jpg_names = {"icard0_1.jpg"}
+for filename in jpg_names:
+    img_color = cv2.imread(f"{IMG_DIR}{filename}", cv2.IMREAD_COLOR)
 
 # Loop through each frame of the video
-frame_num = 0
-while True:
-    read_success, img_color = video.read()
+# frame_num = 0
+# while True:
+    # read_success, img_color = video.read()
     img_backup = img_color.copy()
-    if not read_success:
-        # We have reached the last frame of the video
-        print('End of video')
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    # if not read_success:
+    #     # We have reached the last frame of the video
+    #     print('End of video')
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
         
-        # For the output annotated video
-        #out.release()
+    #     # For the output annotated video
+    #     #out.release()
         
-        # TESTING: accuracy metrics
-        # print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
-        # print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
-        # print(f"False UIN Detection = {sum(false_uin) / len(user_input_accurate_frames)}")
-        # print(f"Num frames = {len(user_input_accurate_frames)}")
+    #     # TESTING: accuracy metrics
+    #     # print(f"Card Detection Accuracy = {sum(user_input_accurate_frames) / len(user_input_accurate_frames)}")
+    #     # print(f"UIN Detection Accuracy = {sum(accurate_uin) / sum(user_input_accurate_frames)}")
+    #     # print(f"False UIN Detection = {sum(false_uin) / len(user_input_accurate_frames)}")
+    #     # print(f"Num frames = {len(user_input_accurate_frames)}")
         
-        sys.exit()
-    # skip the first frame of the video
-    NUM_SKIP = 150
-    frame_num += 150
-    if(frame_num == 150):
-        continue
+    #     sys.exit()
+    # # skip the first frame of the video
+    # NUM_SKIP = 150
+    # frame_num += 150
+    # if(frame_num == 150):
+    #     continue
     
     
     # Switch to grayscale for processing
     img = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
-
+    cv2.imshow("Grayscale", img)
     
     img_poly_contour = img_color
     approx_contour, orig_contour = get_bounding_quadrangle(img, img_backup)
