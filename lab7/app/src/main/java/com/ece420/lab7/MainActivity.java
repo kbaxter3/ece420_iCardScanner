@@ -11,7 +11,6 @@ import android.content.pm.PackageManager;
 import android.Manifest;
 import android.graphics.Bitmap;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -19,17 +18,13 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
 
 import org.opencv.android.BaseLoaderCallback;
 
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
@@ -43,11 +38,9 @@ import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
-import org.opencv.core.Rect2d;
 
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.tracking.TrackerKCF;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -58,11 +51,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.Math;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -75,35 +65,17 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     // UI Variables
     private Button controlButton;
     private Button clipboardButton;
-//k    private SeekBar colorSeekbar;
-//k    private SeekBar widthSeekbar;
-//k    private SeekBar heightSeekbar;
-//k    private TextView widthTextview;
-//k    private TextView heightTextview;
-    private TextView labAccessTextview;
-    private TextView uinTextview;
-    private TextView nameTextview;
     private String nameText;
     private String text;
 
     // Declare OpenCV based camera view base
     private CameraBridgeViewBase mOpenCvCameraView;
-    // Camera size
-    private int myWidth;
-    private int myHeight;
 
     // Mat to store RGBA and Grayscale camera preview frame
     private Mat mRgba;
     private Mat mGray;
     private Mat mWarpPersp;
 
-    // KCF Tracker variables
-    private TrackerKCF myTracker;
-    private Rect2d myROI = new Rect2d(0,0,0,0);
-
-    private int myROIWidth = 70;
-    private int myROIHeight = 70;
-    private Scalar myROIColor = new Scalar(0,0,0);
     private int tracking_flag = -1;
 
     private TessBaseAPI tess;
@@ -170,58 +142,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         } else {
             Log.d(this.getClass().getSimpleName(), "  OpenCVLoader.initDebug(), working.");
         }
-
-        // Setup Lab Access TextView
-        labAccessTextview = (TextView) findViewById(R.id.labAccessTextView);
-        uinTextview = (TextView) findViewById(R.id.uinTextView);
-        nameTextview = (TextView) findViewById(R.id.nameTextView);
-//        // Setup color seek bar
-//        colorSeekbar = (SeekBar) findViewById(R.id.colorSeekBar);
-//        colorSeekbar.setProgress(50);
-//        setColor(50);
-//        colorSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-//        {
-//            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-//            {
-//                setColor(progress);
-//            }
-//            public void onStartTrackingTouch(SeekBar seekBar) {}
-//            public void onStopTrackingTouch(SeekBar seekBar) {}
-//        });
-//
-//        // Setup width seek bar
-//        widthTextview = (TextView) findViewById(R.id.widthTextView);
-//        widthSeekbar = (SeekBar) findViewById(R.id.widthSeekBar);
-//        widthSeekbar.setProgress(myROIWidth - 20);
-//        widthSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-//        {
-//            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-//            {
-//                // Only allow modification when not tracking
-//                if(tracking_flag == -1) {
-//                    myROIWidth = progress + 20;
-//                }
-//            }
-//            public void onStartTrackingTouch(SeekBar seekBar) {}
-//            public void onStopTrackingTouch(SeekBar seekBar) {}
-//        });
-//k
-//k        // Setup width seek bar
-//k        heightTextview = (TextView) findViewById(R.id.heightTextView);
-//k        heightSeekbar = (SeekBar) findViewById(R.id.heightSeekBar);
-//k        heightSeekbar.setProgress(myROIHeight - 20);
-//k        heightSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener()
-//k        {
-//k            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser)
-//k            {
-//k                // Only allow modification when not tracking
-//k               if(tracking_flag == -1) {
-//k                   myROIHeight = progress + 20;
-//k                }
-//k            }
-//k            public void onStartTrackingTouch(SeekBar seekBar) {}
-//k            public void onStopTrackingTouch(SeekBar seekBar) {}
-//k        });
 
         // Setup control button
         controlButton = (Button)findViewById((R.id.controlButton));
@@ -411,7 +331,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 newColor[2] = 255;
                 break;
         }
-        myROIColor.set(newColor);
         return;
     }
 
@@ -421,12 +340,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Log.d(TAG, "onCameraViewStarted");
         mRgba = new Mat(height, width, CvType.CV_8UC4);
         mGray = new Mat(height, width, CvType.CV_8UC1);
-        myWidth = width;
-        myHeight = height;
-        myROI = new Rect2d(myWidth / 2 - myROIWidth / 2,
-                            myHeight / 2 - myROIHeight / 2,
-                            myROIWidth,
-                            myROIHeight);
     }
 
     @Override
@@ -461,14 +374,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         double corners[][] = new double[4][2]; // Could be int
         double slope_array[] = new double[4];  // Could be float
         double y_int_array[] = new double[4];  // Could be float
-
-        // Sort indices based on distance
-//        ArrayList<Integer> dist_idx = new ArrayList<>(num_pts);
-//        dist_idx.set(0, 0); // TODO argsort
-//
-//        for(int i = 0; i < num_pts; i++) {
-//            dist_idx.set(i, i);
-//        }
 
         int dist_idx[] = IntStream.range(0, num_pts)
                 .boxed().sorted((i, j) -> Integer.compare(distances.get(i), distances.get(j)))
@@ -580,287 +485,271 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return;
     }
 
+    private String threshAndOCR(Mat croppedImage) {
+        Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
 
+        // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
+        Bitmap bmp = null;
+        try {
+            bmp = Bitmap.createBitmap(croppedImage.cols(), croppedImage.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(croppedImage, bmp);
+        }
+        catch (CvException e){Log.d("Exception", e.getMessage());}
+
+        tess.setImage(bmp);
+        return tess.getUTF8Text();
+    }
+
+    private class UpdateUITextTask implements Runnable {
+        String str1;
+        String str2;
+        String str3;
+
+        UpdateUITextTask(String s1,String s2,String s3) {str1 = s1; str2 = s2; str3 = s3;}
+
+        public void run() {
+            TextView TextView1 = (TextView) findViewById(R.id.labAccessTextView);
+            TextView1.setText(str1);
+            TextView TextView2 = (TextView) findViewById(R.id.uinTextView);
+            TextView2.setText(str2);
+            TextView TextView3 = (TextView) findViewById(R.id.nameTextView);
+            TextView3.setText(str3);
+        }
+    }
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Log.d(TAG, "onCameraFrame: "+ tracking_flag);
         String labAccessMessage = "Lab Access: ";
-        // Returned frame will be displayed on the screen
+        final MatOfPoint2f MAT_PERSPECTIVE = new MatOfPoint2f(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
+
+        Log.d(TAG, "onCameraFrame: "+ tracking_flag);
+
+        // Freeze Video feed when UIN found
         if(tracking_flag == 1) {
             return mRgba;
-        } else {
-            List<MatOfPoint> img_contours = new ArrayList<>();
-            Mat hierarchy = new Mat();
+        }
 
-            double contour_area = 0.0;
-            double max_area = 0.0;
-            MatOfPoint max_hull_contour = new MatOfPoint();
+        List<MatOfPoint> img_contours = new ArrayList<>();
+        Mat hierarchy = new Mat();
 
-            // Timer
-            long start = Core.getTickCount();
-            // Grab camera frame in rgba and grayscale format
-            mRgba = inputFrame.rgba();
-            // Grab camera frame in gray format
-            mGray = inputFrame.gray().clone();
+        double contour_area = 0.0;
+        double max_area = 0.0;
+        MatOfPoint max_hull_contour = new MatOfPoint();
 
-            // Dilate and Canny Edge detect grayscale img
-            Mat dilateKernel = Mat.ones(3,3,CvType.CV_8UC1);
-            dilateKernel.setTo(new Scalar(255));
+        // Grab camera frame in rgba and grayscale format
+        mRgba = inputFrame.rgba();
+        mGray = inputFrame.gray().clone();
 
-            Imgproc.dilate(mGray, mGray, Mat.ones(3,3,CvType.CV_8UC1));
+        // Dilate and Canny Edge detect grayscale img
+        Imgproc.dilate(mGray, mGray, Mat.ones(3,3,CvType.CV_8UC1));
+        Imgproc.Canny(mGray, mGray, 100, 200, 3, false);
 
-            Imgproc.Canny(mGray, mGray, 100, 200, 3, false);
+///////////// GET LARGEST CONTOUR (CONVEX-HULL AREA)
+        // Get contours from edge image
+        Imgproc.findContours(mGray, img_contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
-            // Get contours from edge image
-            Imgproc.findContours(mGray, img_contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        // Find largest contour by area (close using convex hull)
+        for(int i = 0; i < img_contours.size(); i++) {
+            // Get convex hull of contour
+            MatOfInt hull = new MatOfInt();
+            Imgproc.convexHull(img_contours.get(i), hull);
 
-            // Find largest contour by area (close using convex hull)
-            for(int i = 0; i < img_contours.size(); i++) {
-                // Get convex hull of contour
-                MatOfInt hull = new MatOfInt();
-                Imgproc.convexHull(img_contours.get(i), hull);
-
-                // Create list of points in convex hull (subset of contour points)
-                Point[] cntr_pts = img_contours.get(i).toArray();
-                List<Point> hull_pts = new ArrayList<Point>();
-                for(int idx : hull.toArray()) {
-                    hull_pts.add(cntr_pts[idx]);
-                }
-
-                // Convert list of points to contour
-                MatOfPoint hull_contour = new MatOfPoint();
-                hull_contour.fromList(hull_pts);
-
-                // Calculate hull contour area and overwrite if new max area
-                contour_area = Imgproc.contourArea(hull_contour);
-                if(max_area < contour_area) {
-                    max_hull_contour = hull_contour;
-                    max_area = contour_area;
-                }
+            // Create list of points in convex hull (subset of contour points)
+            Point[] cntr_pts = img_contours.get(i).toArray();
+            List<Point> hull_pts = new ArrayList<Point>();
+            for(int idx : hull.toArray()) {
+                hull_pts.add(cntr_pts[idx]);
             }
 
-            if(max_area > 0) {
-                // Draw max hull contour
-                Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+            // Convert list of points to contour
+            MatOfPoint hull_contour = new MatOfPoint();
+            hull_contour.fromList(hull_pts);
 
-                MatOfPoint quadrangle = new MatOfPoint();
-                quadrangle_approx(max_hull_contour, quadrangle);
+            // Calculate hull contour area and overwrite if new max area
+            contour_area = Imgproc.contourArea(hull_contour);
+            if(max_area < contour_area) {
+                max_hull_contour = hull_contour;
+                max_area = contour_area;
+            }
+        }
 
-                Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+        if(max_area <= 0) {
+            return mRgba;
+        }
 
-                ///// Orient points to be CW, short edge first
-                Point ptArr[] = quadrangle.toArray();
-                Point vec1, vec2;
-                vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
-                vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+        // Draw max hull contour
+        Imgproc.drawContours(mRgba, Arrays.asList(max_hull_contour), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
 
-                // Get CW/CCW by cross product magnitude
-                if(vec1.x * vec2.y - vec1.y * vec2.x > 0) {
-                    // If CCW (Positive crossproduct between vec1 x vec2)
-                    // Reverse points to make it Clockwise
-                    for(int i = 0; i < ptArr.length / 2; i++) {
-                        Point tmp = ptArr[i];
-                        ptArr[i] = ptArr[ptArr.length - i - 1];
-                        ptArr[ptArr.length - i - 1] = tmp;
-                    }
+///////////// GET BOUNDING QUADRANGLE APPROXIMATION OF LARGEST CONTOUR
+        MatOfPoint quadrangle = new MatOfPoint();
+        quadrangle_approx(max_hull_contour, quadrangle);
+
+        Imgproc.drawContours(mRgba, Arrays.asList(quadrangle), 0, new Scalar(0, 255, 0), 2, Core.LINE_8, hierarchy, 0, new Point());
+
+///////////// ORIENT QUADRANGLE POINTS - Orient points to be CW, short edge first
+        Point ptArr[] = quadrangle.toArray();
+        Point vec1, vec2;
+
+        vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+        vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+
+        // Get CW/CCW by cross product magnitude
+        if(vec1.x * vec2.y - vec1.y * vec2.x > 0) {
+            // If CCW (Positive crossproduct between vec1 x vec2)
+            // Reverse points to make it Clockwise
+            for(int i = 0; i < ptArr.length / 2; i++) {
+                Point tmp = ptArr[i];
+                ptArr[i] = ptArr[ptArr.length - i - 1];
+                ptArr[ptArr.length - i - 1] = tmp;
+            }
+        }
+
+        vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
+        vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
+
+        // Check short edge first, by comparing vector magnitudes
+        // if not, roll the pts so short edge is first
+        if( (vec1.x * vec1.x + vec1.y * vec1.y) > (vec2.x * vec2.x + vec2.y * vec2.y) ) {
+            Point tmp = ptArr[ptArr.length - 1];
+
+            for (int i = ptArr.length - 1; i > 0; i--) {
+                ptArr[i] = ptArr[i - 1];
+            }
+
+            ptArr[0] = tmp;
+        }
+
+        // Write back into quadrangle Mat
+        quadrangle.fromArray(ptArr);
+
+///////////// PERSPECTIVE TRANSFORM
+        // Find Perspective Transform
+        MatOfPoint2f quadrangle_2f = new MatOfPoint2f(quadrangle.toArray());
+        Mat M_perspective = Imgproc.getPerspectiveTransform(quadrangle_2f, MAT_PERSPECTIVE);
+
+        // Apply Perpsective Transform
+        mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
+        Mat mWarpColor = new Mat();
+        Imgproc.warpPerspective(mRgba, mWarpColor, M_perspective, mRgba.size());
+        Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
+
+///////////// CHECK FOR 180 ROTATION AND CROP TO UIN & NAME
+        // Orient with the orange stripe on the left
+        double left_red_sum = 0;
+        double right_red_sum = 0;
+
+        for(int i = 0; i < W_PERSPECTIVE / 8; i++) {
+            for(int j = 0; j < H_PERSPECTIVE; j++) {
+                left_red_sum += mWarpColor.get(i,j)[0];
+                right_red_sum += mWarpColor.get(W_PERSPECTIVE - i,j)[0];
+            }
+        }
+
+        // Crop UIN/name area based on card rotation
+        Mat croppedImage, nameCropImg;
+        int x_start, y_start, roi_width, roi_height;
+        int name_x_start, name_y_start, name_roi_width, name_roi_height;
+        Rect uin_roi, name_roi;
+
+        if(left_red_sum < right_red_sum) {
+            // Crop Perspective Transformed Image
+            x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
+            y_start = (int)(0);
+            roi_width = (int)(W_PERSPECTIVE / 4);
+            roi_height = (int)(H_PERSPECTIVE / 10);
+            uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+
+            name_x_start = (int)(W_PERSPECTIVE * (1 - 13 / 100 - 8/10) );
+            name_y_start = (int)(H_PERSPECTIVE * (1 - 73/100 - 1/10) );
+            name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
+            name_roi_height = (int)(H_PERSPECTIVE / 10);
+            name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
+
+            croppedImage = new Mat(mWarpPersp, uin_roi);
+            nameCropImg  = new Mat(mWarpPersp, name_roi);
+
+            Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
+            Core.rotate(nameCropImg, nameCropImg, Core.ROTATE_180);
+        } else {
+            // Crop Perspective Transformed Image
+            x_start = (int)(W_PERSPECTIVE * 20 / 100);
+            y_start = (int)(H_PERSPECTIVE  - (H_PERSPECTIVE / 10));
+            roi_width = (int)(W_PERSPECTIVE / 4);
+            roi_height = (int)(H_PERSPECTIVE / 10);
+            uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
+
+            name_x_start = (int)(W_PERSPECTIVE * 13 / 100 );
+            name_y_start = (int)(H_PERSPECTIVE * 73/100 );
+            name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
+            name_roi_height = (int)(H_PERSPECTIVE / 10);
+            name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
+
+            croppedImage = new Mat(mWarpPersp, uin_roi);
+            nameCropImg  = new Mat(mWarpPersp, name_roi);
+        }
+
+///////////// THRESHOLD IMAGE AND RUN OCR
+        text = threshAndOCR(croppedImage);
+        nameText = threshAndOCR(nameCropImg);
+
+        nameText = nameText.replaceAll("^[^A-Z]*|[^A-Z]*$", "");
+        Log.d(TAG, "Name output: " + nameText);
+
+        // Check if valid UIN
+        boolean isUIN = false;
+        if( text.length() == 9 ) {
+            isUIN = true;
+            for (int i = 0; i < text.length(); i++) {
+                if (!Character.isDigit(text.charAt(i))) {
+                    isUIN = false;
+                    break;
                 }
+            }
+        }
 
-                vec1 = new Point(ptArr[0].x - ptArr[1].x, ptArr[0].y - ptArr[1].y);
-                vec2 = new Point(ptArr[0].x - ptArr[3].x, ptArr[0].y - ptArr[3].y);
-                // Check short edge first, if not roll the pts so it is
-                if( (vec1.x * vec1.x + vec1.y * vec1.y) > (vec2.x * vec2.x + vec2.y * vec2.y) ) {
-                    Point tmp = ptArr[ptArr.length - 1];
+        if(isUIN) {
+            if(prev_uin.equals(text)) {
+                matches_prev_counter++;
+            } else {
+                matches_prev_counter = 0;
+                prev_uin = text;
+            }
 
-                    for (int i = ptArr.length - 1; i > 0; i--) {
-                        ptArr[i] = ptArr[i - 1];
-                    }
+            if(matches_prev_counter >= 2) {
+                // Record time to detection for testing
+                double time_to_detect = (Core.getTickCount() - start_time) / Core.getTickFrequency();
+                Imgproc.putText(mRgba, "Time: " + time_to_detect, new Point(10, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
 
-                    ptArr[0] = tmp;
-                }
+                controlButton.setText("Rescan");
+                tracking_flag = 1;
+                matches_prev_counter = 0;
+                prev_uin = "";
 
-                // Write back into quadrangle Mat
-                quadrangle.fromArray(ptArr);
+                // Check against database
+                boolean has_access = false;
+                InputStream is = getResources().openRawResource(R.raw.lab_access_log);
+                CSVFile csv_file = new CSVFile(is);
 
-                // Find Perspective Transform
-                MatOfPoint2f MAT_PERSPECTIVE = new MatOfPoint2f(new Point(0,0), new Point(0, H_PERSPECTIVE), new Point(W_PERSPECTIVE, H_PERSPECTIVE), new Point(W_PERSPECTIVE, 0));
-                MatOfPoint2f quadrangle_2f = new MatOfPoint2f(quadrangle.toArray());
-                Mat M_perspective = Imgproc.getPerspectiveTransform(quadrangle_2f, MAT_PERSPECTIVE);
+                List list = csv_file.read();
+                String[] l;
+                for (int i = 0; i < list.size(); i++) {
+                    l = (String[]) list.get(i);
 
-                // Apply Perpsective Transform
-                mWarpPersp = new Mat(mGray.height(), mGray.width(), CvType.CV_8UC1);
-                Mat mWarpColor = new Mat();
-                Imgproc.warpPerspective(mRgba, mWarpColor, M_perspective, mRgba.size());
-                Imgproc.warpPerspective(inputFrame.gray(), mWarpPersp, M_perspective, mGray.size());
-
-
-                // Orient with the orange stripe on the left
-                double left_red_sum = 0;
-                double right_red_sum = 0;
-
-                for(int i = 0; i < W_PERSPECTIVE / 8; i++) {
-                    for(int j = 0; j < H_PERSPECTIVE; j++) {
-                        left_red_sum += mWarpColor.get(i,j)[0];
-                        right_red_sum += mWarpColor.get(W_PERSPECTIVE - i,j)[0];
-                    }
-                }
-                Mat croppedImage;
-                Mat nameCropImg;
-                int x_start, y_start, roi_width, roi_height;
-                int name_x_start, name_y_start, name_roi_width, name_roi_height;
-                Rect uin_roi;
-                Rect name_roi;
-                if(left_red_sum < right_red_sum) {
-                    // Crop Perspective Transformed Image
-                    x_start = (int)(W_PERSPECTIVE * (1 - 20 / 100 - 1/4) );
-                    y_start = (int)(0);
-                    roi_width = (int)(W_PERSPECTIVE / 4);
-                    roi_height = (int)(H_PERSPECTIVE / 10);
-                    uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
-
-                    name_x_start = (int)(W_PERSPECTIVE * (1 - 13 / 100 - 8/10) );
-                    name_y_start = (int)(H_PERSPECTIVE * (1 - 73/100 - 1/10) );
-                    name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
-                    name_roi_height = (int)(H_PERSPECTIVE / 10);
-                    name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
-
-                    croppedImage = new Mat(mWarpPersp, uin_roi);
-                    nameCropImg  = new Mat(mWarpPersp, name_roi);
-
-                    Core.rotate(croppedImage, croppedImage, Core.ROTATE_180);
-                    Core.rotate(nameCropImg, nameCropImg, Core.ROTATE_180);
-                }
-                else{
-                    // Crop Perspective Transformed Image
-                    x_start = (int)(W_PERSPECTIVE * 20 / 100);
-                    y_start = (int)(H_PERSPECTIVE  - (H_PERSPECTIVE / 10));
-                    roi_width = (int)(W_PERSPECTIVE / 4);
-                    roi_height = (int)(H_PERSPECTIVE / 10);
-                    uin_roi = new Rect(x_start, y_start, roi_width, roi_height);
-
-                    name_x_start = (int)(W_PERSPECTIVE * 13 / 100 );
-                    name_y_start = (int)(H_PERSPECTIVE * 73/100 );
-                    name_roi_width = (int)(W_PERSPECTIVE * 8 / 10);
-                    name_roi_height = (int)(H_PERSPECTIVE / 10);
-                    name_roi = new Rect(name_x_start, name_y_start, name_roi_width, name_roi_height);
-
-                    croppedImage = new Mat(mWarpPersp, uin_roi);
-                    nameCropImg  = new Mat(mWarpPersp, name_roi);
-                }
-
-                Imgproc.threshold(croppedImage, croppedImage, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
-
-
-                // https://stackoverflow.com/questions/13134682/convert-mat-to-bitmap-opencv-for-android
-                Bitmap bmp = null;
-                try {
-                    //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
-                    bmp = Bitmap.createBitmap(croppedImage.cols(), croppedImage.rows(), Bitmap.Config.ARGB_8888);
-                    Utils.matToBitmap(croppedImage, bmp);
-                }
-                catch (CvException e){Log.d("Exception", e.getMessage());}
-
-                tess.setImage(bmp);
-                text = tess.getUTF8Text();
-//                Imgproc.putText(mRgba, "UIN: "+ text, new Point(mRgba.rows() - 35, 60), Core.FONT_HERSHEY_SIMPLEX, 2, new Scalar(0, 255, 0), 3);
-                Log.d(TAG, "tesseract output: " + text);
-
-                Bitmap bmp2 = null;
-                try {
-                    //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);\
-                    bmp2 = Bitmap.createBitmap(nameCropImg.cols(), nameCropImg.rows(), Bitmap.Config.ARGB_8888);
-                    Utils.matToBitmap(nameCropImg, bmp2);
-                }
-                catch (CvException e){Log.d("Exception", e.getMessage());}
-
-                tess.setImage(bmp2);
-
-                nameText = tess.getUTF8Text();
-                nameText = nameText.replaceAll("^[^A-Z]*|[^A-Z]*$", "");
-//                Imgproc.putText(mRgba, "Name: "+ nameText, new Point(35, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
-                Log.d(TAG, "Name output: " + nameText);
-
-                if(text.length() == 9 ) {
-                    boolean isDigitsOnly = true;
-                    for (int i = 0; i < text.length(); i++) {
-                        if (!Character.isDigit(text.charAt(i))) {
-                            isDigitsOnly = false;
+                    for (String s : l) {
+                        if (s.equals(text)) {
+                            has_access = true;
                             break;
                         }
                     }
-
-                    if(isDigitsOnly) {
-                        if(prev_uin.equals(text)) {
-                            matches_prev_counter++;
-                        }
-                        else {
-                            matches_prev_counter = 0;
-                            prev_uin = text;
-                        }
-
-                        if(matches_prev_counter >= 2) {
-
-                            // Record time to detection for testing
-                            double time_to_detect = (Core.getTickCount() - start_time) / Core.getTickFrequency();
-                            Imgproc.putText(mRgba, "Time: " + time_to_detect, new Point(10, 60), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
-
-                            controlButton.setText("Rescan");
-                            tracking_flag = 1;
-                            matches_prev_counter = 0;
-                            prev_uin = "";
-
-                            // Check against database
-                            boolean has_access = false;
-                            InputStream is = getResources().openRawResource(R.raw.lab_access_log);
-                            CSVFile csv_file = new CSVFile(is);
-
-                            List list = csv_file.read();
-                            String[] l;
-                            for (int i = 0; i < list.size(); i++) {
-                                l = (String[]) list.get(i);
-                                for (int j = 0; j < l.length; j++) {
-                                    if(l[j].equals(text)) {
-                                        has_access = true;
-                                        break;
-                                    }
-                                }
-
-
-                            }
-                            String labAccessDisplay;
-                            if(has_access) {
-                                labAccessMessage = "Lab Access: Yes";
-//                                Imgproc.putText(mRgba, "Has lab access!", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
-                            } else {
-                                labAccessMessage = "Lab Access: No";
-//                                Imgproc.putText(mRgba, "Doesn't have lab access", new Point(35, 600), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
-                            }
-
-
-                        }
-                    }
                 }
+
+                labAccessMessage = (has_access) ? "Lab Access: Yes" : "Lab Access: No";
             }
-
-            class TempTask implements Runnable {
-                String str1;
-                String str2;
-                String str3;
-                TempTask(String s1,String s2,String s3) {str1 = s1; str2 = s2; str3 = s3;}
-                public void run() {
-                    TextView TextView1 = (TextView) findViewById(R.id.labAccessTextView);
-                    TextView1.setText(str1);
-                    TextView TextView2 = (TextView) findViewById(R.id.uinTextView);
-                    TextView2.setText(str2);
-                    TextView TextView3 = (TextView) findViewById(R.id.nameTextView);
-                    TextView3.setText(str3);
-                }
-            }
-
-            MainActivity.this.runOnUiThread(new TempTask(labAccessMessage, "UIN: " + text, "Name: " + nameText));
-
-            return mRgba;
         }
+
+        // Update UI text and update screen
+        MainActivity.this.runOnUiThread(new UpdateUITextTask(labAccessMessage, "UIN: " + text, "Name: " + nameText));
+        return mRgba;
     }
 }
 
